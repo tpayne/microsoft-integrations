@@ -22,6 +22,7 @@ To test the add-in locally, follow these steps:
 
 - **Node.js and npm:** Required for running and managing packages.
 - **Office Add-in CLI:** Install globally with `npm install -g office-addin-cli`.
+- **Running on Unix** This project will only build on Unix systems.
 
 ### Steps
 
