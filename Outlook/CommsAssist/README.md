@@ -12,6 +12,8 @@ The add-in appears as a task pane in Outlook when reading an email. Its main fun
 
 The add-in uses Office.js to read the subject, sender, and body of the current email, creating a detailed prompt for the AI model. It works only in Read Mode and notifies users if accessed in Compose Mode.
 
+**Note** - When deploying this add-in for real, you will need to merge the `pane.css` and `pane.js` files into the main `pane.html` file. You cannot have them separately.
+
 ## II. Running Locally
 
 To test the add-in locally, follow these steps:
