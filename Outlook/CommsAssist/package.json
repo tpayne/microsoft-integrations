@@ -59,6 +59,7 @@
     "test:lint:html": "npx linthtml 'src/outlook/resources/*.html'",
     "test:lint:js": "npx eslint src/**/*.js --fix",
     "test:certs": "run-s certs",
+    "test:build": "run-s build",
     "test:start": "run-s start"
   }
 }

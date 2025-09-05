@@ -1,38 +1,35 @@
 <!doctype html>
 <html lang="en">
     <head>
-        <meta charset="utf-8"/>
-        <meta name="viewport" content="width=device-width, initial-scale=1"/>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Communications Assistant</title>
         <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
         <link rel="stylesheet" href="./pane.css" />
     </head>
+
     <body>
         <h3>Communications Assistant</h3>
-        <!-- This section is only for Read mode -->
         <div class="card" id="read_mode_content">
-            <div>
-                <strong>Subject:</strong> <span id="subj">—</span>
-            </div>
-            <div>
-                <strong>From:</strong> <span id="from">—</span>
-            </div>
+            <div><strong>Subject:</strong> <span id="subj">—</span></div>
+            <div><strong>From:</strong> <span id="from">—</span></div>
             <div>
                 <strong>Preview:</strong>
                 <div id="preview">—</div>
             </div>
         </div>
+        <div class="card" id="sentiment_content">
+            <div><strong>Sentiment:</strong> <span id="sentiment">—</span></div>
+            <div><strong>Intention:</strong> <span id="intention">—</span></div>
+            <div><strong>Urgency:</strong> <span id="urgency">—</span></div>
+        </div>
         <div class="card">
             <button id="btn_quick_reply">Quick Reply</button>
-            <small class="block_small">
-                Opens a reply-all with a suggested draft.
-            </small>
+            <small class="block_small"> Opens a reply-all with a suggested draft. </small>
         </div>
         <div class="card">
             <button id="btn_generate_draft">Generate IT Response</button>
-            <small class="block_small">
-                Drafts an email response using Gemini AI.
-            </small>
+            <small class="block_small"> Drafts an email response using Gemini AI. </small>
         </div>
         <div id="response_container"></div>
         <script src="./pane.js"></script>

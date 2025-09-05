@@ -54,12 +54,46 @@ Office.onReady(async () => {
                           Ensure that the email is formatted correctly to display to a user in a reply window and use markdown
                           with headings, paragraphs, newlines, bullet points, and bold text where appropriate to enhance readability. 
                           Use the format of the user's email to guide your response style.
+                          Write the response in paragraphs with new lines between paragraphs, so they are easy to read.
                           If you need further information, explain what you need and why in clear steps.`;
+  const sentimentPrompt = `You are an expert sentiment analysis.
+                           You will be provided with an email body.
+                           Your task is to analyze the sentiment of the email and respond with one of the following labels only:
+                           "Positive", "Neutral", "Negative".
+                           1. "Positive" sentiment is when the email expresses happiness, satisfaction, gratitude, or any other positive emotion.
+                           2. "Neutral" sentiment is when the email is factual, objective, or does not express any strong emotion.
+                           3. "Negative" sentiment is when the email expresses dissatisfaction, frustration, anger, or any other negative emotion.
+                           The sentiment is based on the overall tone and emotion conveyed in the email body.
+                           The default is "Neutral" unless the email explicitly indicates a positive or negative sentiment.
+                           Do not provide any additional text or explanation, just the label.`;
+  const urgencyPrompt   = `You are an expert at urgency analysis.
+                           You will be provided with an email body.
+                           Your task is to analyze the urgency of the email and respond with one of the following labels only:
+                           "High", "Medium", "Low".
+                           1. "High" urgency is when the email indicates an immediate need for response or action, such as emergencies, critical issues, or tight deadlines.
+                           2. "Medium" urgency is when the email indicates a need for response or action within a reasonable timeframe, such as upcoming deadlines or important but not critical issues.
+                           3. "Low" urgency is when the email indicates no immediate need for response or action, such as general information, casual updates, or non-urgent matters.
+                           The urgency is based on how quickly the sender needs a response, action or how bad the issue sounds.
+                           The default is "Low" unless the email explicitly indicates a higher urgency, a deadline or severe issue.
+                           Do not provide any additional text or explanation, just the label.`;
+  const intentionPrompt = `You are an expert at intention analysis.
+                           You will be provided with an email body.
+                           Your task is to analyze the intention of the email and respond with one of the following labels only:
+                           "Requesting Help", "Providing Information", "IT Issue", "HR Query", "Customer Request", "Other".
+                           1. "Requesting Help" is when the sender is asking for assistance or support.
+                           2. "Providing Information" is when the sender is sharing details, updates, or news.
+                           3. "IT Issue" is when the sender is reporting a technical problem or seeking technical support.
+                           4. "HR Query" is when the sender is asking about human resources-related topics such as policies, benefits, or employment issues.
+                           5. "Customer Request" is when the sender is a customer asking for service, support, or information related to products or services.
+                           The intention is based on the main purpose of the email.
+                           If the email does not roughly fit into one of these categories, respond with "Other". You can do a fuzzy match if needed.
+                           Do not provide any additional text or explanation, just the label.`;
 
   if (!item) {
     log("No mail item found. Add-in may be running in an unsupported context.");
     // Hides the main content and disables buttons
-    document.getElementById("read_mode_content").classList.add("hidden");
+    document.getElementById("read_mode_content").classList.add("hidden");    
+    document.getElementById("sentiment_content").classList.add("hidden");
     document.getElementById("btn_quick_reply").disabled = true;
     document.getElementById("btn_generate_draft").disabled = true;
     // Displays a message to the user
@@ -82,6 +116,7 @@ Office.onReady(async () => {
     log("In READ mode.");
     // Shows the read mode UI and enables the buttons
     document.getElementById("read_mode_content").classList.remove("hidden");
+    document.getElementById("sentiment_content").classList.remove("hidden");
     document.getElementById("btn_quick_reply").disabled = false;
     document.getElementById("btn_generate_draft").disabled = false;
 
@@ -104,14 +139,59 @@ Office.onReady(async () => {
       });
     }
 
-    // Event listener for the 'Quick Reply' button
-    document.getElementById("btn_quick_reply").addEventListener("click", async () => {
+    try {
+      // Retrieves additional email metadata asynchronously
+      let sentiment = "Unknown";
+      let urgency = "Unknown";
+      let intention = "Unknown";
+
+      // Calls the Gemini API to analyze sentiment
       try {
-        // Constructs the prompt for the Gemini API
         const prompt = `
           From: ${document.getElementById("from").textContent}
           Body: ${document.getElementById("preview").textContent}`;
+        sentiment = await callGeminiAPI(prompt, sentimentPrompt);
+        log(`Sentiment analysis result: ${sentiment}`);
+      } catch (error) {
+        log(`Error analyzing sentiment: ${error.message}`);
+      }
+      // Calls the Gemini API to analyze urgency
+      try {
+        const prompt = `
+          From: ${document.getElementById("from").textContent}
+          Body: ${document.getElementById("preview").textContent}`;
+        urgency = await callGeminiAPI(prompt, urgencyPrompt);
+        log(`Urgency analysis result: ${urgency}`);
+      } catch (error) {
+        log(`Error analyzing urgency: ${error.message}`);
+      }
+      // Calls the Gemini API to analyze intention
+      try {
+        const prompt = `
+          From: ${document.getElementById("from").textContent}
+          Body: ${document.getElementById("preview").textContent}`;
+        intention = await callGeminiAPI(prompt, intentionPrompt);
+        log(`Intention analysis result: ${intention}`);
+      } catch (error) {
+        log(`Error analyzing intention: ${error.message}`);
+      }
+      // Logs the retrieved metadata
+      log(`Email Metadata - Sentiment: ${sentiment}, Urgency: ${urgency}, Intention: ${intention}`);
+      // Updates the UI with the retrieved metadata
+      document.getElementById("sentiment").textContent = sentiment;
+      document.getElementById("urgency").textContent = urgency;
+      document.getElementById("intention").textContent = intention;
+    } catch (error) {
+      log(`Error retrieving additional email metadata: ${error.message}`);
+    }
+    
+      // Event listener for the 'Quick Reply' button
+    document.getElementById("btn_quick_reply").addEventListener("click", async () => {
+      try {
         // Calls the Gemini API to generate the draft
+        const prompt = `
+          From: ${document.getElementById("from").textContent}
+          Body: ${document.getElementById("preview").textContent}`;
         const generatedText = await callGeminiAPI(prompt, helpdeskPrompt);
         draft = generatedText;
       } catch (error) {
@@ -130,12 +210,10 @@ Office.onReady(async () => {
       document.getElementById("btn_generate_draft").disabled = true;
       document.getElementById("response_container").textContent = "Generating draft...";
 
-      // Constructs the prompt for the Gemini API
-      const prompt = `
-        From: ${document.getElementById("from").textContent}
-        Body: ${document.getElementById("preview").textContent}`;
-
       try {
+        const prompt = `
+          From: ${document.getElementById("from").textContent}
+          Body: ${document.getElementById("preview").textContent}`;
         // Calls the Gemini API to generate the draft
         const generatedText = await callGeminiAPI(prompt, helpdeskPrompt);
         draft = generatedText;
@@ -156,6 +234,7 @@ Office.onReady(async () => {
     log("In COMPOSE mode.");
     // Hides the main content and disables buttons for compose mode
     document.getElementById("read_mode_content").classList.add("hidden");
+    document.getElementById("sentiment_content").classList.add("hidden");
     document.getElementById("btn_quick_reply").disabled = true;
     document.getElementById("btn_generate_draft").disabled = true;
     document.getElementById("response_container").textContent =
@@ -164,6 +243,7 @@ Office.onReady(async () => {
     log("In an unsupported mode.");
     // Hides the main content and disables buttons for unsupported modes
     document.getElementById("read_mode_content").classList.add("hidden");
+    document.getElementById("sentiment_content").classList.add("hidden");
     document.getElementById("btn_quick_reply").disabled = true;
     document.getElementById("btn_generate_draft").disabled = true;
     document.getElementById("response_container").textContent =
@@ -178,7 +258,7 @@ Office.onReady(async () => {
    * @returns {Promise&lt;string>} A promise that resolves with the generated text.
    */
   async function callGeminiAPI(userQuery, system_instruction) {
-    const apiKey = "&lt;TESTKEYHERE>"; // Replace with your actual API key or use a secure method to store it
+    const apiKey = "&lt;ENTERYOUCODEHERE>"; // Replace with your actual API key or use a secure method to store it
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY is not set in environment variables.");
     }
@@ -255,7 +335,7 @@ Office.onReady(async () => {
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Fri Sep 05 2025 00:34:00 GMT+0100 (British Summer Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Fri Sep 05 2025 03:18:52 GMT+0100 (British Summer Time)
 </footer>
 
 <script> prettyPrint(); </script>
