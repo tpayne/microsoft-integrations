@@ -14,7 +14,7 @@
   <Description DefaultValue="Communications Assistant for Outlook" />
   <IconUrl DefaultValue="https://localhost:3000/icon-32.png" />
   <HighResolutionIconUrl DefaultValue="https://localhost:3000/icon-32.png" />
-
+  <SupportUrl DefaultValue="https://www.microsoft.com/"/>
   <Hosts>
     <Host Name="Mailbox" />
   </Hosts>
