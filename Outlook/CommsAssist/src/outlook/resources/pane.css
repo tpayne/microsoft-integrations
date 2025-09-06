@@ -1,45 +1,132 @@
 /* Sets the base font size, line height, and font family for the entire document body. */
 body {
     font: 14px/1.4 -apple-system, Segoe UI, Roboto, sans-serif;
-    padding: 16px; /* Adds 16px of padding around the body content. */
+    padding: 16px;
+    /* Adds 16px of padding around the body content. */
 }
 
 /* Styles a card-like container with a light gray border and rounded corners. */
 .card {
-    border: 1px solid #ddd; /* Defines a 1px solid light gray border. */
-    border-radius: 10px; /* Applies a 10px border-radius for rounded corners. */
-    padding: 12px; /* Adds 12px of padding inside the card. */
-    margin-bottom: 12px; /* Adds 12px of space below each card. */
+    border: 1px solid #ddd;
+    /* Defines a 1px solid light gray border. */
+    border-radius: 10px;
+    /* Applies a 10px border-radius for rounded corners. */
+    padding: 12px;
+    /* Adds 12px of padding inside the card. */
+    margin-bottom: 12px;
+    /* Adds 12px of space below each card. */
 }
 
 /* Styles a button element. */
 button {
-    padding: 8px 12px; /* Adds 8px vertical and 12px horizontal padding. */
-    border-radius: 8px; /* Applies 8px rounded corners to the button. */
-    border: 1px solid #ccc; /* Defines a 1px solid light gray border. */
-    cursor: pointer; /* Changes the mouse cursor to a pointer when hovering over the button. */
+    padding: 8px 12px;
+    /* Adds 8px vertical and 12px horizontal padding. */
+    border-radius: 8px;
+    /* Applies 8px rounded corners to the button. */
+    border: 1px solid #ccc;
+    /* Defines a 1px solid light gray border. */
+    cursor: pointer;
+    /* Changes the mouse cursor to a pointer when hovering over the button. */
 }
 
 /* Styles inline code snippets. */
 code {
-    background: #f6f6f6; /* Sets a light gray background color. */
-    padding: 2px 6px; /* Adds 2px vertical and 6px horizontal padding. */
-    border-radius: 6px; /* Applies 6px rounded corners. */
+    background: #f6f6f6;
+    /* Sets a light gray background color. */
+    padding: 2px 6px;
+    /* Adds 2px vertical and 6px horizontal padding. */
+    border-radius: 6px;
+    /* Applies 6px rounded corners. */
 }
 
 /* Hides an element from view. */
 .hidden {
-    display: none; /* Removes the element from the document flow and hides it. */
+    display: none;
+    /* Removes the element from the document flow and hides it. */
 }
 
 /* Styles the container for the response. */
 #responseContainer {
-    white-space: pre-wrap; /* Preserves whitespace and wraps text within the container. */
-    min-height: 50px; /* Sets a minimum height of 50px. */
-    background-color: #f9f2f2; /* Sets a light pinkish background color. */
-    border: 1px solid #e0e0e0; /* Defines a 1px solid light gray border. */
-    padding: 10px; /* Adds 10px of padding inside the container. */
-    border-radius: 8px; /* Applies 8px rounded corners. */
-    margin-top: 10px; /* Adds 10px of space above the container. */
-    font-family: monospace; /* Sets the font to a monospace family. */
+    white-space: pre-wrap;
+    /* Preserves whitespace and wraps text within the container. */
+    min-height: 50px;
+    /* Sets a minimum height of 50px. */
+    background-color: #f9f2f2;
+    /* Sets a light pinkish background color. */
+    border: 1px solid #e0e0e0;
+    /* Defines a 1px solid light gray border. */
+    padding: 10px;
+    /* Adds 10px of padding inside the container. */
+    border-radius: 8px;
+    /* Applies 8px rounded corners. */
+    margin-top: 10px;
+    /* Adds 10px of space above the container. */
+    font-family: monospace;
+    /* Sets the font to a monospace family. */
+}
+
+/* Style for the urgency indicator block */
+/* Reshaped the indicator to be a longer bar */
+#urgencyIndicator {
+    display: inline-block;
+    width: 40px;
+    height: 10px;
+    border-radius: 5px;
+    margin-right: 6px;
+    vertical-align: middle;
+    background-color: #6c757d;
+    /* Default grey for 'Unknown' */
+}
+
+/* Increased specificity to override the default color */
+#urgencyIndicator.urgency-high {
+    background-color: #dc3545;
+    /* Red */
+}
+
+#urgencyIndicator.urgency-medium {
+    background-color: #ffc107;
+    /* Yellow */
+}
+
+#urgencyIndicator.urgency-low {
+    background-color: #28a745;
+    /* Green */
+}
+
+/* CSS for the container and icon */
+.infoContainer {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-family: Arial, sans-serif;
+    color: #333;
+}
+
+.infoIcon {
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+}
+
+/* CSS for the expandable content */
+.infoContent {
+    display: none;
+    /* Initially hide the content */
+    max-width: 400px;
+    font-size: 16px;
+    line-height: 1.5;
+    background-color: #f0f8ff;
+    /* Light blue background */
+    border-left: 3px solid #007bff;
+    /* Blue border */
+    padding: 10px 15px;
+    border-radius: 4px;
+    margin-top: 5px;
+    /* Spacing below the icon */
+}
+
+/* CSS to show the content when the 'show' class is added */
+.infoContent.show {
+    display: block;
 }

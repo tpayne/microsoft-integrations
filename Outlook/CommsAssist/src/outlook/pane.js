@@ -7,6 +7,18 @@ function log(message) {
 }
 
 /**
+ * JavaScript function to toggle the 'show' class
+ */
+function toggleInfo() {
+  const infoBlock = document.getElementById("infoBlock");
+  if (infoBlock) {
+    infoBlock.classList.toggle("show");
+  } else {
+    console.error("Error: Element with ID 'infoBlock' not found.");
+  }
+}
+
+/**
  * The main entry point for the Office Add-in.
  * This function runs when the Office document is ready.
  */
@@ -38,7 +50,7 @@ Office.onReady(async () => {
                            The sentiment is based on the overall tone and emotion conveyed in the email body.
                            The default is "Neutral" unless the email explicitly indicates a positive or negative sentiment.
                            Do not provide any additional text or explanation, just the label.`;
-  const urgencyPrompt   = `You are an expert at urgency analysis.
+  const urgencyPrompt = `You are an expert at urgency analysis.
                            You will be provided with an email body.
                            Your task is to analyze the urgency of the email and respond with one of the following labels only:
                            "High", "Medium", "Low".
@@ -64,12 +76,12 @@ Office.onReady(async () => {
   if (!item) {
     log("No mail item found. Add-in may be running in an unsupported context.");
     // Hides the main content and disables buttons
-    document.getElementById("read_mode_content").classList.add("hidden");    
-    document.getElementById("sentiment_content").classList.add("hidden");
-    document.getElementById("btn_quick_reply").disabled = true;
-    document.getElementById("btn_generate_draft").disabled = true;
+    document.getElementById("readModeContent").classList.add("hidden");
+    document.getElementById("sentimentContent").classList.add("hidden");
+    document.getElementById("btnQuickReply").disabled = true;
+    document.getElementById("btnGenerateDraft").disabled = true;
     // Displays a message to the user
-    document.getElementById("response_container").textContent =
+    document.getElementById("responseContainer").textContent =
       "This add-in only works with email messages.";
     return; // Stop execution if no item is available
   }
@@ -78,19 +90,18 @@ Office.onReady(async () => {
 
   // Checks the mode (Read or Compose) of the mail item
   const isReadMode = item.itemType === Office.MailboxEnums.ItemType.Message;
-  const isComposeMode =
-    item.itemType === Office.MailboxEnums.ItemType.MessageCompose;
+  const isComposeMode = item.itemType === Office.MailboxEnums.ItemType.MessageCompose;
 
   // Declaring draft variable here to be available to all listeners
-  let draft = '';
-  
+  let draft = "";
+
   if (isReadMode) {
     log("In READ mode.");
     // Shows the read mode UI and enables the buttons
-    document.getElementById("read_mode_content").classList.remove("hidden");
-    document.getElementById("sentiment_content").classList.remove("hidden");
-    document.getElementById("btn_quick_reply").disabled = false;
-    document.getElementById("btn_generate_draft").disabled = false;
+    document.getElementById("readModeContent").classList.remove("hidden");
+    document.getElementById("sentimentContent").classList.remove("hidden");
+    document.getElementById("btnQuickReply").disabled = false;
+    document.getElementById("btnGenerateDraft").disabled = false;
 
     // Populates the UI with email subject and sender information
     if (item.subject) {
@@ -98,8 +109,7 @@ Office.onReady(async () => {
     }
 
     if (item.from) {
-      document.getElementById("from").textContent =
-        item.from.displayName || item.from.emailAddress;
+      document.getElementById("from").textContent = item.from.displayName || item.from.emailAddress;
       log(`From retrieved: ${item.from.emailAddress}`);
     }
 
@@ -149,16 +159,34 @@ Office.onReady(async () => {
       }
       // Logs the retrieved metadata
       log(`Email Metadata - Sentiment: ${sentiment}, Urgency: ${urgency}, Intention: ${intention}`);
+
+      // Get the indicator element
+      const urgencyIndicator = document.getElementById("urgencyIndicator");
+
       // Updates the UI with the retrieved metadata
       document.getElementById("sentiment").textContent = sentiment;
       document.getElementById("urgency").textContent = urgency;
       document.getElementById("intention").textContent = intention;
+
+      // Update urgency indicator color
+      if (urgencyIndicator) {
+        urgencyIndicator.classList.remove("urgency-high", "urgency-medium", "urgency-low"); // Reset state
+        const processedUrgency = urgency.trim().toLowerCase();
+
+        if (processedUrgency.includes("high")) {
+          urgencyIndicator.classList.add("urgency-high");
+        } else if (processedUrgency.includes("medium")) {
+          urgencyIndicator.classList.add("urgency-medium");
+        } else if (processedUrgency.includes("low")) {
+          urgencyIndicator.classList.add("urgency-low");
+        }
+      }
     } catch (error) {
       log(`Error retrieving additional email metadata: ${error.message}`);
     }
-    
-      // Event listener for the 'Quick Reply' button
-    document.getElementById("btn_quick_reply").addEventListener("click", async () => {
+
+    // Event listener for the 'Quick Reply' button
+    document.getElementById("btnQuickReply").addEventListener("click", async () => {
       try {
         // Calls the Gemini API to generate the draft
         const prompt = `
@@ -177,10 +205,10 @@ Office.onReady(async () => {
     });
 
     // Event listener for the 'Generate Draft' button
-    document.getElementById("btn_generate_draft").addEventListener("click", async () => {
+    document.getElementById("btnGenerateDraft").addEventListener("click", async () => {
       // Disables the button and shows a loading message
-      document.getElementById("btn_generate_draft").disabled = true;
-      document.getElementById("response_container").textContent = "Generating draft...";
+      document.getElementById("btnGenerateDraft").disabled = true;
+      document.getElementById("responseContainer").textContent = "Generating draft...";
 
       try {
         const prompt = `
@@ -190,38 +218,38 @@ Office.onReady(async () => {
         const generatedText = await callGeminiAPI(prompt, helpdeskPrompt);
         draft = generatedText;
         // Displays the generated draft in the response container
-        document.getElementById("response_container").textContent = draft;
+        document.getElementById("responseContainer").textContent = draft;
         log("Draft generated successfully.");
       } catch (error) {
         // Displays an error message on failure
-        document.getElementById("response_container").textContent = "Error: Failed to generate a draft.";
+        document.getElementById("responseContainer").textContent =
+          "Error: Failed to generate a draft.";
         log(`Error generating draft: ${error.message}`);
       } finally {
         // Re-enables the button
-        document.getElementById("btn_generate_draft").disabled = false;
+        document.getElementById("btnGenerateDraft").disabled = false;
       }
     });
-
   } else if (isComposeMode) {
     log("In COMPOSE mode.");
     // Hides the main content and disables buttons for compose mode
-    document.getElementById("read_mode_content").classList.add("hidden");
-    document.getElementById("sentiment_content").classList.add("hidden");
-    document.getElementById("btn_quick_reply").disabled = true;
-    document.getElementById("btn_generate_draft").disabled = true;
-    document.getElementById("response_container").textContent =
+    document.getElementById("readModeContent").classList.add("hidden");
+    document.getElementById("sentimentContent").classList.add("hidden");
+    document.getElementById("btnQuickReply").disabled = true;
+    document.getElementById("btnGenerateDraft").disabled = true;
+    document.getElementById("responseContainer").textContent =
       "This functionality is not available in compose mode.";
   } else {
     log("In an unsupported mode.");
     // Hides the main content and disables buttons for unsupported modes
-    document.getElementById("read_mode_content").classList.add("hidden");
-    document.getElementById("sentiment_content").classList.add("hidden");
-    document.getElementById("btn_quick_reply").disabled = true;
-    document.getElementById("btn_generate_draft").disabled = true;
-    document.getElementById("response_container").textContent =
+    document.getElementById("readModeContent").classList.add("hidden");
+    document.getElementById("sentimentContent").classList.add("hidden");
+    document.getElementById("btnQuickReply").disabled = true;
+    document.getElementById("btnGenerateDraft").disabled = true;
+    document.getElementById("responseContainer").textContent =
       "This add-in only works with email messages.";
   }
-  
+
   /**
    * Calls the Gemini API to generate a response.
    * Includes a retry mechanism with exponential backoff for rate limit errors.
@@ -236,9 +264,27 @@ Office.onReady(async () => {
     }
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
     const payload = {
-      contents: [{ parts: [{ text: userQuery }] }],
-      tools: [{ "google_search": {} }],
-      systemInstruction: { parts: [{ text: system_instruction }] },
+      contents: [
+        {
+          parts: [
+            {
+              text: userQuery,
+            },
+          ],
+        },
+      ],
+      tools: [
+        {
+          google_search: {},
+        },
+      ],
+      systemInstruction: {
+        parts: [
+          {
+            text: system_instruction,
+          },
+        ],
+      },
     };
 
     let attempts = 0;
@@ -249,7 +295,9 @@ Office.onReady(async () => {
       try {
         const response = await fetch(apiUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify(payload),
         });
         log(`Attempt ${attempts + 1}: API response status is ${response.status}`);
@@ -265,9 +313,7 @@ Office.onReady(async () => {
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(
-            `API call failed with status ${response.status}: ${errorText}`
-          );
+          throw new Error(`API call failed with status ${response.status}: ${errorText}`);
         }
 
         const result = await response.json();
@@ -284,9 +330,7 @@ Office.onReady(async () => {
         attempts++;
         log(`Attempt ${attempts}: an error occurred. ${error.message}`);
         if (attempts >= maxAttempts) {
-          throw new Error(
-            `Failed to call Gemini API after ${maxAttempts} attempts.`
-          );
+          throw new Error(`Failed to call Gemini API after ${maxAttempts} attempts.`);
         }
       }
     }

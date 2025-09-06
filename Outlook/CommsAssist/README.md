@@ -61,6 +61,8 @@ To test the add-in locally, follow these steps:
 
 Once loaded, the "Communications Assistant" add-in appears in the Outlook ribbon when reading an email.
 
+![Outlook sanple](Images/email.jpeg)
+
 ## III. Deploying to Outlook
 
 For production deployment:
