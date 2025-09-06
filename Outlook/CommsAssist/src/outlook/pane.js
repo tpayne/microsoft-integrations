@@ -26,20 +26,16 @@ Office.onReady(async () => {
   log("Office.js is ready.");
   const item = Office.context?.mailbox?.item;
 
-  const helpdeskPrompt = `You are an automated IT helpdesk email chatbot for a corporate IT support desk. 
-                          You refer to yourself as HelpBot. You know everything about common IT problems. 
-                          Respond as if you were an IT helpdesk professional, keeping calm but empathizing with the sentiment 
-                          of the message used. Do not get patronizing however. Shape your response as if talking to a 
-                          semi-IT literate person using an email format. You do not know anything about topics other 
-                          than common IT problems. You are truthful and never lie. Never make up facts and 
-                          if you are not 100% sure reply with why you cannot answer in a truthful way. 
-                          If you can, cite references that can be used to further diagnose or help fix the issue. 
-                          Return the full email text only, do not return any other text.
-                          Ensure that the email is formatted correctly to display to a user in a reply window and use markdown
-                          with headings, paragraphs, newlines, bullet points, and bold text where appropriate to enhance readability. 
-                          Use the format of the user's email to guide your response style.
-                          Write the response in paragraphs with new lines between paragraphs, so they are easy to read.
-                          If you need further information, explain what you need and why in clear steps.`;
+  const helpdeskPrompt = `You are an automated IT helpdesk email chatbot for a corporate IT support desk.
+                          You refer to yourself as HelpBot. You know everything about common IT problems.
+                          Respond as if you were an IT helpdesk professional, keeping calm but empathizing with the sentiment
+                          of the message used. Do not get patronizing however. Shape your response as if talking to a
+                          semi-IT literate person using an email format. You do not know anything about topics other
+                          than common IT problems. You are truthful and never lie. Never make up facts and
+                          if you are not 100% sure reply with why you cannot answer in a truthful way.
+                          When providing instructions or lists, use numbered lists. Use **bold** for emphasis on key words or phrases.
+                          Return the full email text as HTML only, do not return any other text. Wrap the response in <html><body>...</body></html> tags.
+                          You may use multiple paragraphs, headings, and ordered/unordered lists to structure your response, and you may use simple HTML tags like <b> and <p> for emphasis.`;
   const sentimentPrompt = `You are an expert sentiment analysis.
                            You will be provided with an email body.
                            Your task is to analyze the sentiment of the email and respond with one of the following labels only:
@@ -67,7 +63,7 @@ Office.onReady(async () => {
                            1. "Requesting Help" is when the sender is asking for assistance or support.
                            2. "Providing Information" is when the sender is sharing details, updates, or news.
                            3. "IT Issue" is when the sender is reporting a technical problem or seeking technical support.
-                           4. "HR Query" is when the sender is asking about human resources-related topics such as policies, benefits, or employment issues.
+                           4. "HR Query" is when the sender is asking about human resources-related topics suchs as policies, benefits, or employment issues.
                            5. "Customer Request" is when the sender is a customer asking for service, support, or information related to products or services.
                            The intention is based on the main purpose of the email.
                            If the email does not roughly fit into one of these categories, respond with "Other". You can do a fuzzy match if needed.
@@ -187,20 +183,32 @@ Office.onReady(async () => {
 
     // Event listener for the 'Quick Reply' button
     document.getElementById("btnQuickReply").addEventListener("click", async () => {
+      // Disables the button and shows a loading message
+      document.getElementById("btnQuickReply").disabled = true;
+      document.getElementById("responseContainer").innerHTML = "Generating draft...";
+
       try {
         // Calls the Gemini API to generate the draft
         const prompt = `
           From: ${document.getElementById("from").textContent}
           Body: ${document.getElementById("preview").textContent}`;
         const generatedText = await callGeminiAPI(prompt, helpdeskPrompt);
+
         draft = generatedText;
+        log("Draft generated successfully.");
       } catch (error) {
-        draft = "Error generating draft. Please try again.";
+        draft = "<html><body><p>Error generating draft. Please try again.</p></body></html>";
         log(`Error generating draft: ${error.message}`);
+      } finally {
+        // Re-enables the button
+        document.getElementById("btnQuickReply").disabled = false;
+        document.getElementById("responseContainer").innerHTML = "Draft generated successfully.";
       }
-      // Displays the generated draft in a reply form
+      // Displays the generated draft in a reply form with HTML coercion
       if (item.displayReplyAllForm) {
-        item.displayReplyAllForm(draft);
+        item.displayReplyAllForm(draft, {
+          coercionType: Office.CoercionType.Html,
+        });
       }
     });
 
@@ -208,7 +216,7 @@ Office.onReady(async () => {
     document.getElementById("btnGenerateDraft").addEventListener("click", async () => {
       // Disables the button and shows a loading message
       document.getElementById("btnGenerateDraft").disabled = true;
-      document.getElementById("responseContainer").textContent = "Generating draft...";
+      document.getElementById("responseContainer").innerHTML = "Generating draft...";
 
       try {
         const prompt = `
@@ -218,11 +226,11 @@ Office.onReady(async () => {
         const generatedText = await callGeminiAPI(prompt, helpdeskPrompt);
         draft = generatedText;
         // Displays the generated draft in the response container
-        document.getElementById("responseContainer").textContent = draft;
+        document.getElementById("responseContainer").innerHTML = draft;
         log("Draft generated successfully.");
       } catch (error) {
         // Displays an error message on failure
-        document.getElementById("responseContainer").textContent =
+        document.getElementById("responseContainer").innerHTML =
           "Error: Failed to generate a draft.";
         log(`Error generating draft: ${error.message}`);
       } finally {
@@ -237,7 +245,7 @@ Office.onReady(async () => {
     document.getElementById("sentimentContent").classList.add("hidden");
     document.getElementById("btnQuickReply").disabled = true;
     document.getElementById("btnGenerateDraft").disabled = true;
-    document.getElementById("responseContainer").textContent =
+    document.getElementById("responseContainer").innerHTML =
       "This functionality is not available in compose mode.";
   } else {
     log("In an unsupported mode.");
@@ -246,7 +254,7 @@ Office.onReady(async () => {
     document.getElementById("sentimentContent").classList.add("hidden");
     document.getElementById("btnQuickReply").disabled = true;
     document.getElementById("btnGenerateDraft").disabled = true;
-    document.getElementById("responseContainer").textContent =
+    document.getElementById("responseContainer").innerHTML =
       "This add-in only works with email messages.";
   }
 
