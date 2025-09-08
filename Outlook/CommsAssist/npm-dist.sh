@@ -46,6 +46,6 @@ done > "$DIST_PUBLIC_DIR/pane.html"
 # Step 4: Copy remaining resource files to the correct locations
 echo "Copying manifest.xml and other resources..."
 cp "$RESOURCES_DIR/manifest.xml" "$DIST_DIR/manifest.xml"
-cp "$RESOURCES_DIR/icon-32.png" "$DIST_PUBLIC_DIR/icon-32.png"
+cp $RESOURCES_DIR/*.png "$DIST_PUBLIC_DIR/"
 
 echo "Build process completed successfully! Final files are in the 'dist' folder."

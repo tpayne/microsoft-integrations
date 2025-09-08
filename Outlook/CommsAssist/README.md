@@ -66,6 +66,8 @@ Once loaded, the "Communications Assistant" add-in appears in the Outlook ribbon
 
 ![Draft Reply sample](Images/emailDraft.jpeg)
 
+![Outlook sample](Images/outlook.png)
+
 ## III. Deploying to Outlook
 
 For production deployment:
