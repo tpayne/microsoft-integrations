@@ -1,8 +1,21 @@
+:root {
+  --bg-color: white;
+  --text-color: black;
+}
+ 
 /* Sets the base font size, line height, and font family for the entire document body. */
 body {
     font: 14px/1.4 -apple-system, Segoe UI, Roboto, sans-serif;
     padding: 16px;
+    background-color: var(--bg-color);
+    color: var(--text-color);
     /* Adds 16px of padding around the body content. */
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 /* Styles a card-like container with a light gray border and rounded corners. */
@@ -94,39 +107,8 @@ code {
     /* Green */
 }
 
-/* CSS for the container and icon */
-.infoContainer {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    font-family: Arial, sans-serif;
-    color: #333;
-}
-
 .infoIcon {
     cursor: pointer;
     font-size: 20px;
     line-height: 1;
-}
-
-/* CSS for the expandable content */
-.infoContent {
-    display: none;
-    /* Initially hide the content */
-    max-width: 400px;
-    font-size: 16px;
-    line-height: 1.5;
-    background-color: #f0f8ff;
-    /* Light blue background */
-    border-left: 3px solid #007bff;
-    /* Blue border */
-    padding: 10px 15px;
-    border-radius: 4px;
-    margin-top: 5px;
-    /* Spacing below the icon */
-}
-
-/* CSS to show the content when the 'show' class is added */
-.infoContent.show {
-    display: block;
 }

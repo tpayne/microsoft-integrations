@@ -7,14 +7,36 @@ function log(message) {
 }
 
 /**
- * JavaScript function to toggle the 'show' class
+ * Updates the document body styles based on the Office theme.
+ * @param {Object} theme - The Office theme object.
  */
-function toggleInfo() {
-  const infoBlock = document.getElementById("infoBlock");
-  if (infoBlock) {
-    infoBlock.classList.toggle("show");
-  } else {
-    console.error("Error: Element with ID 'infoBlock' not found.");
+function updateThemeStyles(theme) {
+  if (theme) {
+    document.documentElement.style.setProperty('--bg-color', theme.bodyBackgroundColor);
+    document.documentElement.style.setProperty('--text-color', theme.bodyForegroundColor);
+  }
+}
+
+/**
+ * Registers the Office theme change event handler.
+ */
+function registerThemeChangeHandler() {
+  const mailbox = Office.context?.mailbox;
+  if (mailbox) {
+    mailbox.addHandlerAsync(
+      Office.EventType.OfficeThemeChanged,
+      (eventArgs) => {
+        const theme = eventArgs.officeTheme;
+        updateThemeStyles(theme);
+      },
+      (result) => {
+        if (result.status === Office.AsyncResultStatus.Failed) {
+          console.error("Failed to register theme change handler:", result.error.message);
+        } else {
+          log("Theme change handler registered successfully.");
+        }
+      }
+    );
   }
 }
 
@@ -22,8 +44,18 @@ function toggleInfo() {
  * The main entry point for the Office Add-in.
  * This function runs when the Office document is ready.
  */
-Office.onReady(async () => {
+Office.onReady(async (info) => {
   log("Office.js is ready.");
+  
+  // Set initial theme
+  const theme = Office.context.officeTheme;
+  if (theme) {
+    updateThemeStyles(theme);
+  }
+
+  // Register theme change handler after onReady
+  registerThemeChangeHandler();
+
   const item = Office.context?.mailbox?.item;
 
   const helpdeskPrompt = `You are an automated IT helpdesk email chatbot for a corporate IT support desk.
@@ -141,6 +173,7 @@ Office.onReady(async () => {
         urgency = await callGeminiAPI(prompt, urgencyPrompt);
         log(`Urgency analysis result: ${urgency}`);
       } catch (error) {
+        console.error(`Error analyzing urgency: ${error.message}`);
         log(`Error analyzing urgency: ${error.message}`);
       }
       // Calls the Gemini API to analyze intention
@@ -151,6 +184,7 @@ Office.onReady(async () => {
         intention = await callGeminiAPI(prompt, intentionPrompt);
         log(`Intention analysis result: ${intention}`);
       } catch (error) {
+        console.error(`Error analyzing intention: ${error.message}`);
         log(`Error analyzing intention: ${error.message}`);
       }
       // Logs the retrieved metadata
@@ -178,6 +212,7 @@ Office.onReady(async () => {
         }
       }
     } catch (error) {
+      console.error(`Error retrieving additional email metadata: ${error.message}`);
       log(`Error retrieving additional email metadata: ${error.message}`);
     }
 
@@ -199,6 +234,7 @@ Office.onReady(async () => {
       } catch (error) {
         draft = "<html><body><p>Error generating draft. Please try again.</p></body></html>";
         log(`Error generating draft: ${error.message}`);
+        console.error(`Error generating draft: ${error.message}`);
       } finally {
         // Re-enables the button
         document.getElementById("btnQuickReply").disabled = false;
@@ -233,6 +269,7 @@ Office.onReady(async () => {
         document.getElementById("responseContainer").innerHTML =
           "Error: Failed to generate a draft.";
         log(`Error generating draft: ${error.message}`);
+        console.error(`Error generating draft: ${error.message}`);
       } finally {
         // Re-enables the button
         document.getElementById("btnGenerateDraft").disabled = false;
