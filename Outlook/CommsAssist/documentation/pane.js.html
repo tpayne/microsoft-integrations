@@ -34,14 +34,67 @@ function log(message) {
   console.log(`[DEBUG] ${message}`);
 }
 
+// A private variable to hold our configuration data.
+// A Map is used for efficient key-value pair storage and retrieval.
+let configMap = new Map();
+
+/**
+ * Fetches the config.json file from the specified URL,
+ * parses the JSON, and loads the key-value pairs into a map.
+ * This is an asynchronous operation.
+ * @param {string} url The URL of the config.json file.
+ * @returns {Promise&lt;void>} A promise that resolves when the config is loaded.
+ */
+/**
+ * Fetches the config.json file from the specified URL,
+ * parses the JSON, and loads the key-value pairs into a map.
+ * This is an asynchronous operation.
+ * @param {string} url The URL of the config.json file.
+ * @returns {Promise&lt;void>} A promise that resolves when the config is loaded.
+ */
+async function loadConfig(url) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const parsedData = await response.json();
+ 
+    // Unpack the key-value pairs into the global map
+    for (const key in parsedData) {
+      configMap.set(key, parsedData[key]);
+    }
+  } catch (e) {
+    console.error(`Failed to load configuration: ${e.message}`);
+    throw e;
+  }
+}
+
+/**
+ * Retrieves a value from the configuration map using its key.
+ * @param {string} key The key to look up in the config.
+ * @returns {*} The value associated with the key, or undefined if the key is not found.
+ */
+function getVar(key) {
+  if (configMap.size !== 0) {
+    const value = configMap.get(key);
+    // If the value is an array, join its elements with a newline character.
+    if (Array.isArray(value)) {
+        return value.join(String.fromCharCode(10));
+    }
+    return value;
+  }
+  return "";
+}
+
 /**
  * Updates the document body styles based on the Office theme.
  * @param {Object} theme - The Office theme object.
  */
 function updateThemeStyles(theme) {
   if (theme) {
-    document.documentElement.style.setProperty('--bg-color', theme.bodyBackgroundColor);
-    document.documentElement.style.setProperty('--text-color', theme.bodyForegroundColor);
+    document.documentElement.style.setProperty("--bg-color", theme.bodyBackgroundColor);
+    document.documentElement.style.setProperty("--text-color", theme.bodyForegroundColor);
   }
 }
 
@@ -69,12 +122,112 @@ function registerThemeChangeHandler() {
 }
 
 /**
+ * Calls the Gemini API to generate a response.
+ * Includes a retry mechanism with exponential backoff for rate limit errors.
+ * @param {string} userQuery - The user's query to send to the API.
+ * @param {string} system_instruction - The system instruction for the API.
+ * @returns {Promise&lt;string>} A promise that resolves with the generated text.
+ */
+async function callGeminiAPI(userQuery, system_instruction) {
+  const apiKey = getVar("google_api_key"); // Replace with your actual API key or use a secure method to store it
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not set in environment variables.");
+  }
+  const apiUrl = `${getVar("endpoint_url")}${apiKey}`;
+  const payload = {
+    contents: [
+      {
+        parts: [
+          {
+            text: userQuery,
+          },
+        ],
+      },
+    ],
+    tools: [
+      {
+        google_search: {},
+      },
+    ],
+    systemInstruction: {
+      parts: [
+        {
+          text: system_instruction,
+        },
+      ],
+    },
+  };
+
+  let attempts = 0;
+  const maxAttempts = 5;
+  const baseDelay = 1000;
+
+  while (attempts &lt; maxAttempts) {
+    try {
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      log(`Attempt ${attempts + 1}: API response status is ${response.status}`);
+
+      // Handles rate limiting with exponential backoff
+      if (response.status === 429) {
+        const delay = baseDelay * Math.pow(2, attempts) + Math.random() * 1000;
+        attempts++;
+        log(`Rate limit exceeded. Retrying in ${delay}ms.`);
+        await new Promise((res) => setTimeout(res, delay));
+        continue;
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API call failed with status ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      const candidate = result.candidates?.[0];
+
+      // Checks for a valid response format and returns the generated text
+      if (candidate &amp;&amp; candidate.content?.parts?.[0]?.text) {
+        log("API call successful.");
+        return candidate.content.parts[0].text;
+      } else {
+        throw new Error("Invalid response format from API.");
+      }
+    } catch (error) {
+      attempts++;
+      log(`Attempt ${attempts}: an error occurred. ${error.message}`);
+      if (attempts >= maxAttempts) {
+        throw new Error(`Failed to call Gemini API after ${maxAttempts} attempts.`);
+      }
+    }
+  }
+}
+
+/**
  * The main entry point for the Office Add-in.
  * This function runs when the Office document is ready.
  */
 Office.onReady(async (info) => {
   log("Office.js is ready.");
-  
+  const configUrl = "https://localhost:3000/config/config.json";
+
+  // Load the config file from the specified URL
+  try {
+    await loadConfig(configUrl);
+    log("Configuration loaded successfully.");
+  } catch (error) {
+    console.error(`Failed to load configuration: ${error.message}`);
+    log(`Failed to load configuration: ${error.message}`);
+  }
+
+  if (info) {
+    log(`Add-in is running in ${info.host} on ${info.platform}.`);
+  }
+
   // Set initial theme
   const theme = Office.context.officeTheme;
   if (theme) {
@@ -86,48 +239,10 @@ Office.onReady(async (info) => {
 
   const item = Office.context?.mailbox?.item;
 
-  const helpdeskPrompt = `You are an automated IT helpdesk email chatbot for a corporate IT support desk.
-                          You refer to yourself as HelpBot. You know everything about common IT problems.
-                          Respond as if you were an IT helpdesk professional, keeping calm but empathizing with the sentiment
-                          of the message used. Do not get patronizing however. Shape your response as if talking to a
-                          semi-IT literate person using an email format. You do not know anything about topics other
-                          than common IT problems. You are truthful and never lie. Never make up facts and
-                          if you are not 100% sure reply with why you cannot answer in a truthful way.
-                          When providing instructions or lists, use numbered lists. Use **bold** for emphasis on key words or phrases.
-                          Return the full email text as HTML only, do not return any other text. Wrap the response in &lt;html>&lt;body>...&lt;/body>&lt;/html> tags.
-                          You may use multiple paragraphs, headings, and ordered/unordered lists to structure your response, and you may use simple HTML tags like &lt;b> and &lt;p> for emphasis.`;
-  const sentimentPrompt = `You are an expert sentiment analysis.
-                           You will be provided with an email body.
-                           Your task is to analyze the sentiment of the email and respond with one of the following labels only:
-                           "Positive", "Neutral", "Negative".
-                           1. "Positive" sentiment is when the email expresses happiness, satisfaction, gratitude, or any other positive emotion.
-                           2. "Neutral" sentiment is when the email is factual, objective, or does not express any strong emotion.
-                           3. "Negative" sentiment is when the email expresses dissatisfaction, frustration, anger, or any other negative emotion.
-                           The sentiment is based on the overall tone and emotion conveyed in the email body.
-                           The default is "Neutral" unless the email explicitly indicates a positive or negative sentiment.
-                           Do not provide any additional text or explanation, just the label.`;
-  const urgencyPrompt = `You are an expert at urgency analysis.
-                           You will be provided with an email body.
-                           Your task is to analyze the urgency of the email and respond with one of the following labels only:
-                           "High", "Medium", "Low".
-                           1. "High" urgency is when the email indicates an immediate need for response or action, such as emergencies, critical issues, or tight deadlines.
-                           2. "Medium" urgency is when the email indicates a need for response or action within a reasonable timeframe, such as upcoming deadlines or important but not critical issues.
-                           3. "Low" urgency is when the email indicates no immediate need for response or action, such as general information, casual updates, or non-urgent matters.
-                           The urgency is based on how quickly the sender needs a response, action or how bad the issue sounds.
-                           The default is "Low" unless the email explicitly indicates a higher urgency, a deadline or severe issue.
-                           Do not provide any additional text or explanation, just the label.`;
-  const intentionPrompt = `You are an expert at intention analysis.
-                           You will be provided with an email body.
-                           Your task is to analyze the intention of the email and respond with one of the following labels only:
-                           "Requesting Help", "Providing Information", "IT Issue", "HR Query", "Customer Request", "Other".
-                           1. "Requesting Help" is when the sender is asking for assistance or support.
-                           2. "Providing Information" is when the sender is sharing details, updates, or news.
-                           3. "IT Issue" is when the sender is reporting a technical problem or seeking technical support.
-                           4. "HR Query" is when the sender is asking about human resources-related topics suchs as policies, benefits, or employment issues.
-                           5. "Customer Request" is when the sender is a customer asking for service, support, or information related to products or services.
-                           The intention is based on the main purpose of the email.
-                           If the email does not roughly fit into one of these categories, respond with "Other". You can do a fuzzy match if needed.
-                           Do not provide any additional text or explanation, just the label.`;
+  const helpdeskPrompt = getVar("helpdeskPrompt");
+  const sentimentPrompt = getVar("sentimentPrompt");
+  const urgencyPrompt = getVar("urgencyPrompt");
+  const intentionPrompt = getVar("intentionPrompt");
 
   if (!item) {
     log("No mail item found. Add-in may be running in an unsupported context.");
@@ -322,93 +437,8 @@ Office.onReady(async (info) => {
     document.getElementById("responseContainer").innerHTML =
       "This add-in only works with email messages.";
   }
-
-  /**
-   * Calls the Gemini API to generate a response.
-   * Includes a retry mechanism with exponential backoff for rate limit errors.
-   * @param {string} userQuery - The user's query to send to the API.
-   * @param {string} system_instruction - The system instruction for the API.
-   * @returns {Promise&lt;string>} A promise that resolves with the generated text.
-   */
-  async function callGeminiAPI(userQuery, system_instruction) {
-    const apiKey = "&lt;ENTERYOUCODEHERE>"; // Replace with your actual API key or use a secure method to store it
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY is not set in environment variables.");
-    }
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-    const payload = {
-      contents: [
-        {
-          parts: [
-            {
-              text: userQuery,
-            },
-          ],
-        },
-      ],
-      tools: [
-        {
-          google_search: {},
-        },
-      ],
-      systemInstruction: {
-        parts: [
-          {
-            text: system_instruction,
-          },
-        ],
-      },
-    };
-
-    let attempts = 0;
-    const maxAttempts = 5;
-    const baseDelay = 1000;
-
-    while (attempts &lt; maxAttempts) {
-      try {
-        const response = await fetch(apiUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        });
-        log(`Attempt ${attempts + 1}: API response status is ${response.status}`);
-
-        // Handles rate limiting with exponential backoff
-        if (response.status === 429) {
-          const delay = baseDelay * Math.pow(2, attempts) + Math.random() * 1000;
-          attempts++;
-          log(`Rate limit exceeded. Retrying in ${delay}ms.`);
-          await new Promise((res) => setTimeout(res, delay));
-          continue;
-        }
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`API call failed with status ${response.status}: ${errorText}`);
-        }
-
-        const result = await response.json();
-        const candidate = result.candidates?.[0];
-
-        // Checks for a valid response format and returns the generated text
-        if (candidate &amp;&amp; candidate.content?.parts?.[0]?.text) {
-          log("API call successful.");
-          return candidate.content.parts[0].text;
-        } else {
-          throw new Error("Invalid response format from API.");
-        }
-      } catch (error) {
-        attempts++;
-        log(`Attempt ${attempts}: an error occurred. ${error.message}`);
-        if (attempts >= maxAttempts) {
-          throw new Error(`Failed to call Gemini API after ${maxAttempts} attempts.`);
-        }
-      }
-    }
-  }
-});</code></pre>
+});
+</code></pre>
         </article>
     </section>
 
@@ -418,13 +448,13 @@ Office.onReady(async (info) => {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#log">log</a></li><li><a href="global.html#registerThemeChangeHandler">registerThemeChangeHandler</a></li><li><a href="global.html#updateThemeStyles">updateThemeStyles</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#callGeminiAPI">callGeminiAPI</a></li><li><a href="global.html#getVar">getVar</a></li><li><a href="global.html#loadConfig">loadConfig</a></li><li><a href="global.html#log">log</a></li><li><a href="global.html#registerThemeChangeHandler">registerThemeChangeHandler</a></li><li><a href="global.html#updateThemeStyles">updateThemeStyles</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Mon Sep 08 2025 13:02:04 GMT+0100 (British Summer Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Tue Sep 09 2025 11:51:28 GMT+0100 (British Summer Time)
 </footer>
 
 <script> prettyPrint(); </script>

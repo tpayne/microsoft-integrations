@@ -20,6 +20,7 @@ rm -rf "$DIST_DIR"
 echo "Creating new dist directories: $DIST_DIR and $DIST_PUBLIC_DIR"
 mkdir -p "$DIST_DIR"
 mkdir -p "$DIST_PUBLIC_DIR"
+mkdir -p "$DIST_PUBLIC_DIR/config"
 
 # Step 2: Read the content of the CSS and JS files
 echo "Reading source files..."
@@ -47,5 +48,6 @@ done > "$DIST_PUBLIC_DIR/pane.html"
 echo "Copying manifest.xml and other resources..."
 cp "$RESOURCES_DIR/manifest.xml" "$DIST_DIR/manifest.xml"
 cp $RESOURCES_DIR/*.png "$DIST_PUBLIC_DIR/"
+cp $RESOURCES_DIR/config.json "$DIST_PUBLIC_DIR/config/"
 
 echo "Build process completed successfully! Final files are in the 'dist' folder."
