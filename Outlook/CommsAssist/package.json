@@ -53,6 +53,7 @@
     "clean": "rm -rf dist",
     "dist": "sh ./npm-dist.sh",
     "distdev": "mkdir dist && mkdir dist/public && cp src/outlook/*.js dist/public && cp src/outlook/resources/* dist/public && mv dist/public/manifest.xml dist",
+    "docker": "docker build . -t outlookcom",
     "lint": "run-s test:lint:*",
     "start": "npx http-server dist/public -S -C localhost.pem -K localhost-key.pem -p 3000",
     "test": "run-s test:*",
