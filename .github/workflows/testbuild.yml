@@ -1,0 +1,28 @@
+name: Build and Test Docker Images
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "Outlook/CommsAssist/**"
+  pull_request:
+    paths:
+      - "Outlook/CommsAssist/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.ref }}CiTest
+  cancel-in-progress: true
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build the NPM Docker image
+        run: |
+          cd Outlook/CommsAssist
+          docker build . --file Dockerfile --tag comms-assist-build:latest
