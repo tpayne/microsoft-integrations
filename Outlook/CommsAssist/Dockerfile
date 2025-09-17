@@ -1,5 +1,5 @@
 # Use a Node.js base image to run the npm commands
-FROM node:18-alpine AS build_stage
+FROM node:22-alpine AS build_stage
 
 # Set the working directory inside the container
 WORKDIR /app
