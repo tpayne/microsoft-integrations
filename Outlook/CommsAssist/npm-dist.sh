@@ -47,6 +47,8 @@ done > "$DIST_PUBLIC_DIR/pane.html"
 # Step 4: Copy remaining resource files to the correct locations
 echo "Copying manifest.xml and other resources..."
 cp "$RESOURCES_DIR/manifest.xml" "$DIST_DIR/manifest.xml"
+cp "$RESOURCES_DIR/server.xml" "$DIST_DIR/server.xml"
+
 cp $RESOURCES_DIR/*.png "$DIST_PUBLIC_DIR/"
 cp $RESOURCES_DIR/config.json "$DIST_PUBLIC_DIR/config/"
 

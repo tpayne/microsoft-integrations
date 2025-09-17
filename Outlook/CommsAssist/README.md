@@ -99,3 +99,34 @@ For production deployment:
 - **Manifest & Icons:**  
   Ensure referenced icon files (icon-16.png, icon-32.png, icon-80.png) are created and hosted.
 
+## V. CloudRun Deployment
+
+For CloudRun deployments, you will need to do the following.
+
+- **Build the Image**
+  Use Docker to build and test the image
+
+```bash
+  docker build . -t outlookserver
+  docker run --rm -it -p 8080:3000 outlookserver
+  curl -s localhost:8080/pane.html | grep "Communications Assistant" > /dev/null 2>&1
+  echo $?
+```
+
+  Ensure the returned value is `0`
+
+- **Deploy the Image to CloudRun**
+  Deploy the image to CloudRun via
+
+```bash
+  gcloud run deploy outlookserver \
+    --source . \
+    --region us-central1 \
+    --platform managed \
+    --description "Outlook Server for Comms Assist" \
+    --allow-unauthenticated \
+    --execution-environment gen2 \
+    --ingress all \
+    --port 3000
+```
+
