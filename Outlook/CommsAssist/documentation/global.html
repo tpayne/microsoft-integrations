@@ -104,6 +104,166 @@
     
 
     
+    <h4 class="name" id="callCustomeEndpoint"><span class="type-signature">(async) </span>callCustomeEndpoint<span class="signature">(userQuery)</span><span class="type-signature"> &rarr; {Promise.&lt;string>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Calls the custom API to generate a response.
+Includes a retry mechanism with exponential backoff for rate limit errors.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>userQuery</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The user's query to send to the API.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line137">line 137</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A promise that resolves with the generated text.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;string></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
     <h4 class="name" id="callGeminiAPI"><span class="type-signature">(async) </span>callGeminiAPI<span class="signature">(userQuery, system_instruction)</span><span class="type-signature"> &rarr; {Promise.&lt;string>}</span></h4>
     
 
@@ -229,7 +389,7 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line103">line 103</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line197">line 197</a>
     </li></ul></dd>
     
 
@@ -796,7 +956,7 @@ This is an asynchronous operation.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line76">line 76</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line111">line 111</a>
     </li></ul></dd>
     
 
@@ -821,6 +981,207 @@ This is an asynchronous operation.
 
 
 
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="setMetaData"><span class="type-signature"></span>setMetaData<span class="signature">(sentiment, urgency, intention)</span><span class="type-signature"> &rarr; {void}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Sets the metadata for the email pane.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>sentiment</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The sentiment of the email.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>urgency</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The urgency of the email.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>intention</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The intention of the email.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line69">line 69</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">void</span>
+
+
+    </dd>
+</dl>
+
+    
 
 
 
@@ -933,7 +1294,7 @@ This is an asynchronous operation.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line66">line 66</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line101">line 101</a>
     </li></ul></dd>
     
 
@@ -979,13 +1340,13 @@ This is an asynchronous operation.
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#callGeminiAPI">callGeminiAPI</a></li><li><a href="global.html#getVar">getVar</a></li><li><a href="global.html#loadConfig">loadConfig</a></li><li><a href="global.html#log">log</a></li><li><a href="global.html#registerThemeChangeHandler">registerThemeChangeHandler</a></li><li><a href="global.html#updateThemeStyles">updateThemeStyles</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#callCustomeEndpoint">callCustomeEndpoint</a></li><li><a href="global.html#callGeminiAPI">callGeminiAPI</a></li><li><a href="global.html#getVar">getVar</a></li><li><a href="global.html#loadConfig">loadConfig</a></li><li><a href="global.html#log">log</a></li><li><a href="global.html#registerThemeChangeHandler">registerThemeChangeHandler</a></li><li><a href="global.html#setMetaData">setMetaData</a></li><li><a href="global.html#updateThemeStyles">updateThemeStyles</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Tue Sep 09 2025 11:51:28 GMT+0100 (British Summer Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Sep 17 2025 14:48:15 GMT+0100 (British Summer Time)
 </footer>
 
 <script> prettyPrint(); </script>
