@@ -1,5 +1,5 @@
 {
-    "customendpoint_url": "https://emailprocessor-468084470598.us-central1.run.app/query",
+    "customendpoint_url": "<ENTERYOURENDPOINT>",
     "endpoint_url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=",
     "google_api_key": "<ENTERYOUCODEHERE>",
     "helpdeskPrompt": [

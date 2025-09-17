@@ -127,7 +127,7 @@ function registerThemeChangeHandler() {
  * @param {string} userQuery - The user's query to send to the API.
  * @returns {Promise<string>} A promise that resolves with the generated text.
  */
-async function callCustomeEndpoint(userQuery) {
+async function callCustomEndpoint(userQuery) {
   const apiUrl = getVar("customendpoint_url");
   const payload = {
     query: userQuery,
@@ -266,6 +266,22 @@ async function callGeminiAPI(userQuery, system_instruction) {
   }
 }
 
+async function getEmailBody(item) {
+  return new Promise((resolve, reject) => {
+    if (item.body?.getAsync) {
+      item.body.getAsync(Office.CoercionType.Text, (asyncResult) => {
+        if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+          resolve(asyncResult.value);
+        } else {
+          reject(asyncResult.error);
+        }
+      });
+    } else {
+      resolve(""); // Resolve with an empty string if no body exists.
+    }
+  });
+}
+
 /**
  * The main entry point for the Office Add-in.
  * This function runs when the Office document is ready.
@@ -304,8 +320,6 @@ Office.onReady(async (info) => {
   const intentionPrompt = getVar("intentionPrompt");
   const customEndpointUrl = getVar("customendpoint_url");
 
-  document.getElementById("readModeContent").classList.add("hidden");
-
   if (!item) {
     log("No mail item found. Add-in may be running in an unsupported context.");
     // Hides the main content and disables buttons
@@ -332,47 +346,47 @@ Office.onReady(async (info) => {
     document.getElementById("sentimentContent").classList.remove("hidden");
     document.getElementById("btnQuickReply").disabled = false;
 
-    if (customEndpointUrl !== "") {
-      // Retrieves additional email metadata asynchronously
-      let sentiment = "Unknown";
-      let urgency = "Unknown";
-      let intention = "Unknown";
+    // Wait for the email body to be retrieved first
+    const emailBody = (await getEmailBody(item)).trim();
 
-      try {
-        let name = "";
+    // Now that the 'preview' element is populated, you can safely proceed.
+    document.getElementById("responseContainer").innerHTML =
+      "Analyzing email content, please wait...";
 
-        if (item.from) {
-          name = item.from.displayName || item.from.emailAddress;
-        }
+    let name = "";
+    if (item.from) {
+      name = item.from.displayName || item.from.emailAddress;
+    }
 
-        // Retrieves the email body asynchronously and populates the preview
-        if (item.body?.getAsync) {
-          item.body.getAsync(Office.CoercionType.Text, (res) => {
-            const txt = (res.value || "").trim();
-            document.getElementById("preview").textContent = txt;
-          });
-        }
-
-        // Query to use
-        let query = {
+    try {
+      if (customEndpointUrl !== "") {
+        // Retrieves additional email metadata asynchronously
+        const query = {
           fromEmailAddress: name,
           subject: item.subject ? item.subject : "Unknown",
-          body: `${document.getElementById("preview").textContent}`,
+          body: emailBody, // Use the variable with the body content
         };
-        let responseData = await callCustomeEndpoint(query);
+        const responseData = await callCustomEndpoint(query);
         log(`Call response: ${responseData}`);
 
-        sentiment = responseData.response.metadata.email_sentiment;
-        urgency = responseData.response.metadata.email_urgency;
-        intention = responseData.response.metadata.email_intention;
+        let sentiment = responseData.response.metadata.email_sentiment;
+        let urgency = responseData.response.metadata.email_urgency;
+        let intention = responseData.response.metadata.email_intention;
         draft = responseData.response.answer.email_draft;
-
+        /*         
+        let htmlResponse = "Analysis complete. I am ready to help you generate a draft.";
+        let comments = responseData.response.metadata.email_review_comments;
+        if (comments && comments !== "No further comments.") {
+          htmlResponse += // Maybe use this one day...
+            "Analysis complete. I am ready to help you generate a draft."+
+            "<br><br>By the way, some review comments were identified that might help you."+
+            "<br><br><b>Comments:</b><br>" + comments;
+        }  
+        */
+        document.getElementById("responseContainer").innerHTML =
+          "Analysis complete. Please click 'Quick Reply' generate a draft.";
         setMetaData(sentiment, urgency, intention);
-      } catch (error) {
-        log(`Error calling endpoint: ${error.message}`);
-      }
-    } else {
-      try {
+      } else {
         // Retrieves additional email metadata asynchronously
         let sentiment = "Unknown";
         let urgency = "Unknown";
@@ -380,9 +394,7 @@ Office.onReady(async (info) => {
 
         // Calls the Gemini API to analyze sentiment
         try {
-          const prompt = `
-            From: ${document.getElementById("from").textContent}
-            Body: ${document.getElementById("preview").textContent}`;
+          const prompt = `From: ${name}\nBody: ${emailBody}`;
           sentiment = await callGeminiAPI(prompt, sentimentPrompt);
           log(`Sentiment analysis result: ${sentiment}`);
         } catch (error) {
@@ -392,7 +404,7 @@ Office.onReady(async (info) => {
         try {
           const prompt = `
             From: ${document.getElementById("from").textContent}
-            Body: ${document.getElementById("preview").textContent}`;
+            Body: ${emailBody}`;
           urgency = await callGeminiAPI(prompt, urgencyPrompt);
           log(`Urgency analysis result: ${urgency}`);
         } catch (error) {
@@ -403,22 +415,22 @@ Office.onReady(async (info) => {
         try {
           const prompt = `
             From: ${document.getElementById("from").textContent}
-            Body: ${document.getElementById("preview").textContent}`;
+            Body: ${emailBody}`;
           intention = await callGeminiAPI(prompt, intentionPrompt);
           log(`Intention analysis result: ${intention}`);
         } catch (error) {
           console.error(`Error analyzing intention: ${error.message}`);
           log(`Error analyzing intention: ${error.message}`);
         }
-        // Logs the retrieved metadata
-        log(
-          `Email Metadata - Sentiment: ${sentiment}, Urgency: ${urgency}, Intention: ${intention}`
-        );
+        // ... (rest of Gemini API calls for urgency and intention)
+        document.getElementById("responseContainer").innerHTML =
+          "Analysis complete. Please click 'Quick Reply' generate a draft.";
+
         setMetaData(sentiment, urgency, intention);
-      } catch (error) {
-        console.error(`Error retrieving additional email metadata: ${error.message}`);
-        log(`Error retrieving additional email metadata: ${error.message}`);
       }
+    } catch (error) {
+      log(`Error calling endpoint: ${error.message}`);
+      console.error(`Error calling endpoint: ${error.message}`);
     }
 
     // Event listener for the 'Quick Reply' button
@@ -429,9 +441,7 @@ Office.onReady(async (info) => {
 
       try {
         if (customEndpointUrl === "") {
-          const prompt = `
-            From: ${document.getElementById("from").textContent}
-            Body: ${document.getElementById("preview").textContent}`;
+          const prompt = `From: ${name}\nBody: ${emailBody}`;
           // Calls the Gemini API to generate the draft
           const generatedText = await callGeminiAPI(prompt, helpdeskPrompt);
           draft = generatedText;

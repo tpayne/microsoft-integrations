@@ -59,13 +59,18 @@ code {
 }
 
 /* Styles the container for the response. */
+
+
+/* Styles the container for the response. */
 #responseContainer {
     white-space: pre-wrap;
     /* Preserves whitespace and wraps text within the container. */
     min-height: 50px;
     /* Sets a minimum height of 50px. */
-    background-color: #f9f9f9;
-    /* Sets a light pinkish background color. */
+    background-color: var(--bg-color);
+    /* Sets the background color to follow the theme. */
+    color: var(--text-color);
+    /* Sets the text color to follow the theme. */
     border: 1px solid #e0e0e0;
     /* Defines a 1px solid light gray border. */
     padding: 10px;
