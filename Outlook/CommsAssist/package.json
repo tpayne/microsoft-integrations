@@ -25,7 +25,7 @@
     "@types/office-js": "^1.0.377",
     "@types/office-runtime": "^1.0.35",
     "eslint": "^9.27.0",
-    "eslint-plugin-eslint-plugin": "^6.4.0",
+    "eslint-plugin-eslint-plugin": "^7.0.0",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-office-addins": "^4.0.3",
     "eslint-plugin-react": "^7.37.5",
