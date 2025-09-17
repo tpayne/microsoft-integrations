@@ -17,13 +17,6 @@ let configMap = new Map();
  * @param {string} url The URL of the config.json file.
  * @returns {Promise<void>} A promise that resolves when the config is loaded.
  */
-/**
- * Fetches the config.json file from the specified URL,
- * parses the JSON, and loads the key-value pairs into a map.
- * This is an asynchronous operation.
- * @param {string} url The URL of the config.json file.
- * @returns {Promise<void>} A promise that resolves when the config is loaded.
- */
 async function loadConfig(url) {
   try {
     const response = await fetch(url);
@@ -31,7 +24,7 @@ async function loadConfig(url) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const parsedData = await response.json();
- 
+
     // Unpack the key-value pairs into the global map
     for (const key in parsedData) {
       configMap.set(key, parsedData[key]);
@@ -52,7 +45,7 @@ function getVar(key) {
     const value = configMap.get(key);
     // If the value is an array, join its elements with a newline character.
     if (Array.isArray(value)) {
-        return value.join(String.fromCharCode(10));
+      return value.join(String.fromCharCode(10));
     }
     return value;
   }
@@ -66,8 +59,8 @@ function getVar(key) {
  * @param {string} intention - The intention of the email.
  * @returns {void}
  */
-function setMetaData(sentiment,urgency,intention) {
-    // Logs the retrieved metadata
+function setMetaData(sentiment, urgency, intention) {
+  // Logs the retrieved metadata
   log(`Email Metadata - Sentiment: ${sentiment}, Urgency: ${urgency}, Intention: ${intention}`);
 
   // Get the indicator element
@@ -137,7 +130,7 @@ function registerThemeChangeHandler() {
 async function callCustomeEndpoint(userQuery) {
   const apiUrl = getVar("customendpoint_url");
   const payload = {
-    query: userQuery
+    query: userQuery,
   };
 
   let attempts = 0;
@@ -311,13 +304,11 @@ Office.onReady(async (info) => {
   const intentionPrompt = getVar("intentionPrompt");
   const customEndpointUrl = getVar("customendpoint_url");
 
+  document.getElementById("readModeContent").classList.add("hidden");
+
   if (!item) {
     log("No mail item found. Add-in may be running in an unsupported context.");
     // Hides the main content and disables buttons
-    const readModeContent = document.getElementById("readModeContent");
-    if (readModeContent) {
-          readModeContent.classList.add("hidden");
-    }
     document.getElementById("sentimentContent").classList.add("hidden");
     document.getElementById("btnQuickReply").disabled = true;
     // Displays a message to the user
@@ -338,10 +329,6 @@ Office.onReady(async (info) => {
   if (isReadMode) {
     log("In READ mode.");
     // Shows the read mode UI and enables the buttons
-    const readModeContent = document.getElementById("readModeContent");
-    if (readModeContent) {
-          readModeContent.classList.add("hidden");
-    }
     document.getElementById("sentimentContent").classList.remove("hidden");
     document.getElementById("btnQuickReply").disabled = false;
 
@@ -353,22 +340,25 @@ Office.onReady(async (info) => {
 
       try {
         let name = "";
-        let body = "";
 
         if (item.from) {
           name = item.from.displayName || item.from.emailAddress;
-        }  
+        }
+
+        // Retrieves the email body asynchronously and populates the preview
         if (item.body?.getAsync) {
           item.body.getAsync(Office.CoercionType.Text, (res) => {
-          body = (res.value || "").trim();
-        })};
+            const txt = (res.value || "").trim();
+            document.getElementById("preview").textContent = txt;
+          });
+        }
 
         // Query to use
         let query = {
-          "fromEmailAddress": name,
-          "subject": (item.subject) ? item.subject : "Unknown",
-          "body": body,
-        } 
+          fromEmailAddress: name,
+          subject: item.subject ? item.subject : "Unknown",
+          body: `${document.getElementById("preview").textContent}`,
+        };
         let responseData = await callCustomeEndpoint(query);
         log(`Call response: ${responseData}`);
 
@@ -421,7 +411,9 @@ Office.onReady(async (info) => {
           log(`Error analyzing intention: ${error.message}`);
         }
         // Logs the retrieved metadata
-        log(`Email Metadata - Sentiment: ${sentiment}, Urgency: ${urgency}, Intention: ${intention}`);
+        log(
+          `Email Metadata - Sentiment: ${sentiment}, Urgency: ${urgency}, Intention: ${intention}`
+        );
         setMetaData(sentiment, urgency, intention);
       } catch (error) {
         console.error(`Error retrieving additional email metadata: ${error.message}`);
@@ -463,7 +455,6 @@ Office.onReady(async (info) => {
   } else if (isComposeMode) {
     log("In COMPOSE mode.");
     // Hides the main content and disables buttons for compose mode
-    document.getElementById("readModeContent").classList.add("hidden");
     document.getElementById("sentimentContent").classList.add("hidden");
     document.getElementById("btnQuickReply").disabled = true;
     document.getElementById("responseContainer").innerHTML =
@@ -471,7 +462,6 @@ Office.onReady(async (info) => {
   } else {
     log("In an unsupported mode.");
     // Hides the main content and disables buttons for unsupported modes
-    document.getElementById("readModeContent").classList.add("hidden");
     document.getElementById("sentimentContent").classList.add("hidden");
     document.getElementById("btnQuickReply").disabled = true;
     document.getElementById("responseContainer").innerHTML =
