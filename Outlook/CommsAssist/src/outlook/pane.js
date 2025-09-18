@@ -53,6 +53,23 @@ function getVar(key) {
 }
 
 /**
+ * Removes the leading and trailing triple-backtick 'html' fences from a string.
+ * This is useful for cleaning up code blocks formatted with Markdown.
+ *
+ * @param {string} content - The string that may contain the HTML fences.
+ * @returns {string} The string with the fences removed.
+ */
+function removeHtmlFences(content) {
+  const fence = '```html' + String.fromCharCode(10);
+  
+  if (content.startsWith(fence) && content.endsWith('```')) {
+    return content.slice(fence.length, -3);
+  }
+  
+  return content;
+}
+
+/**
  * Sets the metadata for the email pane.
  * @param {string} sentiment - The sentiment of the email.
  * @param {string} urgency - The urgency of the email.
@@ -139,6 +156,7 @@ async function callCustomEndpoint(userQuery) {
 
   while (attempts < maxAttempts) {
     try {
+      log(`Attempting to call custom API. Attempt ${attempts + 1} of ${maxAttempts}.`);
       const response = await fetch(apiUrl, {
         method: "POST",
         headers: {
@@ -174,7 +192,7 @@ async function callCustomEndpoint(userQuery) {
       attempts++;
       log(`Attempt ${attempts}: an error occurred. ${error.message}`);
       if (attempts >= maxAttempts) {
-        throw new Error(`Failed to call Gemini API after ${maxAttempts} attempts.`);
+        throw new Error(`Failed to call custom API after ${maxAttempts} attempts.`);
       }
     }
   }
@@ -372,7 +390,7 @@ Office.onReady(async (info) => {
         let sentiment = responseData.response.metadata.email_sentiment;
         let urgency = responseData.response.metadata.email_urgency;
         let intention = responseData.response.metadata.email_intention;
-        draft = responseData.response.answer.email_draft;
+        draft = removeHtmlFences(responseData.response.answer.email_draft);
         /*         
         let htmlResponse = "Analysis complete. I am ready to help you generate a draft.";
         let comments = responseData.response.metadata.email_review_comments;

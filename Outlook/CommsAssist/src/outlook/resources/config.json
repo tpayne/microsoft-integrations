@@ -1,5 +1,5 @@
 {
-    "customendpoint_url": "<ENTERYOURENDPOINT>",
+    "customendpoint_url": "<ENTERENDPOINTHERE>",
     "endpoint_url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=",
     "google_api_key": "<ENTERYOUCODEHERE>",
     "helpdeskPrompt": [
