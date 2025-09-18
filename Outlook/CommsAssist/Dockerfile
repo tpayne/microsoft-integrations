@@ -4,6 +4,8 @@ FROM node:22-alpine AS build_stage
 # Set the working directory inside the container
 WORKDIR /app
 
+RUN apk add --no-cache bash
+
 # Copy package.json and package-lock.json and install dependencies
 # This step is cached and only re-run if these files change
 COPY package*.json ./
