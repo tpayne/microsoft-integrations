@@ -306,8 +306,8 @@ async function getEmailBody(item) {
  */
 Office.onReady(async (info) => {
   log("Office.js is ready.");
-  const configUrl = "https://localhost:3000/config/config.json";
-
+  const configUrl = "config/config.json";
+  
   // Load the config file from the specified URL
   try {
     await loadConfig(configUrl);
