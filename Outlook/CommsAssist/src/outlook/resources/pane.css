@@ -60,9 +60,6 @@ code {
 }
 
 /* Styles the container for the response. */
-
-
-/* Styles the container for the response. */
 #responseContainer {
     white-space: pre-wrap;
     /* Preserves whitespace and wraps text within the container. */
@@ -82,6 +79,13 @@ code {
     /* Adds 10px of space above the container. */
     font-family: -apple-system, Segoe UI, Roboto, sans-serif;
     /* Sets the font to a monospace family. */
+}
+
+/* Styles the container for the Quick Reply button to have a flexbox layout. */
+#quick-reply-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 /* Style for the urgency indicator block */
