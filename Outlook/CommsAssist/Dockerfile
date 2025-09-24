@@ -21,7 +21,7 @@ RUN npm run clean && npm run dist
 # -----------------------------------------------------------------------------
 
 # Use the official Tomcat image for the final production environment
-FROM tomcat:10.1.46-jre17-temurin AS final_stage
+FROM tomcat:11.0.11-jre17-temurin AS final_stage
 
 # Copy the built files from the 'dist/public' directory of the build stage
 # into the correct location in the Tomcat webapps directory.
