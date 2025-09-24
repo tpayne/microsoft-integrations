@@ -4,7 +4,6 @@ name: "CodeQL Scan"
 
 on:
   push:
-    branches:
     paths:
       - "Outlook/CommsAssist/**"
   pull_request:
