@@ -25,3 +25,13 @@ jobs:
         run: |
           cd Outlook/CommsAssist
           docker build . --file Dockerfile --tag comms-assist-build:latest
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'comms-assist-build:latest'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
