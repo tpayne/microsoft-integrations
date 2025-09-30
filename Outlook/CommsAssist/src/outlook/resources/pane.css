@@ -1,124 +1,140 @@
-:root {
-  --bg-color: white;
-  --text-color: black;
-}
- 
-/* Sets the base font size, line height, and font family for the entire document body. */
-body {
-    font: 14px/1.4 -apple-system, Segoe UI, Roboto, sans-serif;
-    padding: 16px;
-    background-color: var(--bg-color);
-    color: var(--text-color);
-    /* Adds 16px of padding around the body content. */
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-/* Styles a card-like container with a light gray border and rounded corners. */
-/* Styles a card-like container with a light gray border and rounded corners. */
-.card {
-    border: 1px solid #ddd;
-    /* Defines a 1px solid light gray border. */
-    border-radius: 10px;
-    /* Applies a 10px border-radius for rounded corners. */
-    padding: 12px;
-    /* Adds 12px of padding inside the card. */
-    margin-bottom: 12px;
-    /* Adds 12px of space below each card. */
+:root{
+  /* Light theme (defaults) */
+  --bg: #ffffff;
+  --surface: #fbfcfd;
+  --muted: #6b7280;
+  --border: #e6e9ee;
+  --text: #111827;
+  --accent: #0f64ff;
+  --success: #16a34a;
+  --warn: #f59e0b;
+  --danger: #ef4444;
+  --radius: 10px;
+  --gap: 12px;
+  --pad: 14px;
+  --shadow: 0 1px 2px rgba(16,24,40,0.04);
+  color-scheme: light dark;
+  font-size: 14px;
+  line-height: 1.4;
+  font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
 }
 
-/* Styles a button element. */
-button {
-    padding: 8px 12px;
-    /* Adds 8px vertical and 12px horizontal padding. */
-    border-radius: 8px;
-    /* Applies 8px rounded corners to the button. */
-    border: 1px solid #ccc;
-    /* Defines a 1px solid light gray border. */
-    cursor: pointer;
-    /* Changes the mouse cursor to a pointer when hovering over the button. */
+/* Dark theme overrides */
+@media (prefers-color-scheme: dark) {
+  :root{
+    --bg: #0b1220;
+    --surface: #0f1724;
+    --muted: #9ca3af;
+    --border: #1f2937;
+    --text: #e6edf3;
+    --accent: #58a6ff;
+    --success: #34d399;
+    --warn: #fbbf24;
+    --danger: #fb7185;
+    --shadow: 0 1px 4px rgba(2,6,23,0.6);
+  }
 }
 
-/* Styles inline code snippets. */
-code {
-    background: #f6f6f6;
-    /* Sets a light gray background color. */
-    padding: 2px 6px;
-    /* Adds 2px vertical and 6px horizontal padding. */
-    border-radius: 6px;
-    /* Applies 6px rounded corners. */
+/* Apply variables to document */
+*{box-sizing:border-box}
+
+html,body{
+  height:100%;
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  padding:16px;
+  transition:background .15s ease,color .15s ease;
 }
 
-/* Hides an element from view. */
-.hidden {
-    display: none;
-    /* Removes the element from the document flow and hides it. */
+/* Header / branding */
+.header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:var(--gap);
+  margin-bottom:12px;
+}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{
+  width:36px;height:36px;border-radius:8px;
+  background:linear-gradient(135deg,var(--accent) 0%,#5aa8ff 100%);
+  color:white;font-weight:700;display:flex;align-items:center;justify-content:center;
+  font-size:14px;box-shadow:var(--shadow);
+}
+.title{font-size:15px;margin:0;font-weight:600}
+
+/* Info button */
+.infoBtn{
+  background:transparent;border:1px solid var(--border);padding:6px;border-radius:8px;cursor:pointer;
+  color:var(--text);
+}
+.infoBtn:focus{outline:3px solid rgba(15,100,255,0.18);}
+
+/* Card */
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:var(--pad);
+  margin-bottom:12px;
+  box-shadow:var(--shadow);
+}
+.row{display:flex;justify-content:space-between;align-items:center;padding:6px 0}
+.muted{color:var(--muted);font-weight:500;font-size:13px}
+
+/* Urgency indicator */
+.urgencyGroup{display:flex;align-items:center;gap:8px}
+.urgency-indicator{
+  display:inline-block;width:48px;height:10px;border-radius:999px;background:#cbd5e1;
+  border:1px solid rgba(0,0,0,0.03);
+}
+.urgency-indicator.high{background:var(--danger)}
+.urgency-indicator.medium{background:var(--warn)}
+.urgency-indicator.low{background:var(--success)}
+.urgency-indicator.unknown{background:#cfd8e3}
+
+/* Actions */
+.actions{display:flex;flex-direction:column;gap:8px}
+button{font-weight:600;border-radius:8px;padding:8px 12px;border:1px solid transparent;cursor:pointer;color:var(--text)}
+button.primary{background:var(--accent);color:white}
+button.primary:hover{filter:brightness(.98)}
+button.ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+button:focus{outline:3px solid rgba(15,100,255,0.16);}
+
+/* Response container */
+/* Make response container consistent with .card */
+.response{
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  border-radius: var(--radius);
+  padding: var(--pad);
+  min-height: 60px;
+  white-space: pre-wrap;
+  font-size: 13px;
+  color: var(--text);
+  transition: background .15s ease, color .15s ease, box-shadow .12s ease;
 }
 
-/* Styles the container for the response. */
-#responseContainer {
-    white-space: pre-wrap;
-    /* Preserves whitespace and wraps text within the container. */
-    min-height: 50px;
-    /* Sets a minimum height of 50px. */
-    background-color: var(--bg-color);
-    /* Sets the background color to follow the theme. */
-    color: var(--text-color);
-    /* Sets the text color to follow the theme. */
-    border: 1px solid #e0e0e0;
-    /* Defines a 1px solid light gray border. */
-    padding: 10px;
-    /* Adds 10px of padding inside the container. */
-    border-radius: 8px;
-    /* Applies 8px rounded corners. */
-    margin-top: 10px;
-    /* Adds 10px of space above the container. */
-    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
-    /* Sets the font to a monospace family. */
+
+/* Small hint */
+.hint{color:var(--muted);font-size:12px}
+
+/* Utilities */
+.hidden{display:none}
+
+/* Responsive tweaks for narrow panes */
+@media (max-width:360px){
+  .logo{width:32px;height:32px;font-size:13px}
+  :root{--pad:10px;--gap:8px}
+  .response{min-height:48px}
 }
 
-/* Styles the container for the Quick Reply button to have a flexbox layout. */
-#quick-reply-card {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-/* Style for the urgency indicator block */
-/* Reshaped the indicator to be a longer bar */
-#urgencyIndicator {
-    display: inline-block;
-    width: 40px;
-    height: 10px;
-    border-radius: 5px;
-    margin-right: 6px;
-    vertical-align: middle;
-    background-color: #6c757d;
-    /* Default grey for 'Unknown' */
-}
-
-/* Increased specificity to override the default color */
-#urgencyIndicator.urgency-high {
-    background-color: #dc3545;
-    /* Red */
-}
-
-#urgencyIndicator.urgency-medium {
-    background-color: #ffc107;
-    /* Yellow */
-}
-
-#urgencyIndicator.urgency-low {
-    background-color: #28a745;
-    /* Green */
-}
-
-.infoIcon {
-    cursor: pointer;
-    font-size: 20px;
-    line-height: 1;
+/* Respect high contrast user settings */
+@media (forced-colors: active) {
+  *{forced-color-adjust: none}
+  .logo{background:CanvasText;color:Canvas}
 }

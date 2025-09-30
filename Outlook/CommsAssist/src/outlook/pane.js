@@ -1,3 +1,100 @@
+// Apply Office theme (if available) and keep variables consistent with CSS names.
+function applyOfficeThemeVars(theme) {
+  if (!theme) return;
+
+  // Hardcoded defaults that mirror your CSS :root light theme
+  const FALLBACKS = {
+    bg: "#ffffff",
+    surface: "#fbfcfd",
+    text: "#111827",
+    border: "#e6e9ee",
+    muted: "#6b7280",
+    accent: "#0f64ff",
+    shadow: "0 1px 2px rgba(16,24,40,0.04)"
+  };
+
+  // Helper: read a CSS variable safely with multiple fallbacks
+  function readCssVar(name) {
+    // 1) Prefer window.getComputedStyle if available
+    try {
+      if (typeof window !== "undefined" && typeof window.getComputedStyle === "function") {
+        const comp = window.getComputedStyle(document.documentElement);
+        const val = comp.getPropertyValue(name);
+        if (val) return val.trim();
+      }
+    } catch {
+      // ignore and try next fallback
+    }
+
+    // 2) Fallback to inline style set on documentElement
+    try {
+      const inline = document.documentElement.style.getPropertyValue(name);
+      if (inline) return inline.trim();
+    } catch {
+      // ignore and try next fallback
+    }
+
+    // 3) Final fallback to hardcoded token (strip leading -- and return)
+    const key = name.replace(/^--/, "");
+    return FALLBACKS[key] || "";
+  }
+
+  // Read current CSS tokens safely
+  const currentBg = readCssVar("--bg") || FALLBACKS.bg;
+  const currentText = readCssVar("--text") || FALLBACKS.text;
+
+  // Prefer explicit Office theme values when present, otherwise keep current tokens
+  const bodyBg = (theme.bodyBackgroundColor && String(theme.bodyBackgroundColor).trim()) ? theme.bodyBackgroundColor : currentBg;
+  const bodyFg = (theme.bodyForegroundColor && String(theme.bodyForegroundColor).trim()) ? theme.bodyForegroundColor : currentText;
+
+  // Apply to document variables
+  try {
+    document.documentElement.style.setProperty("--bg", bodyBg);
+    document.documentElement.style.setProperty("--surface", bodyBg);
+    document.documentElement.style.setProperty("--text", bodyFg);
+
+    // Optionally adjust border and muted for contrast if Office provides tokens (example)
+    if (theme.bodyBorderColor) {
+      document.documentElement.style.setProperty("--border", theme.bodyBorderColor);
+    }
+    if (theme.bodySubtleColor) {
+      document.documentElement.style.setProperty("--muted", theme.bodySubtleColor);
+    }
+  } catch (e) {
+    console.warn("applyOfficeThemeVars: failed to set CSS variables", e);
+  }
+}
+
+// Register Office theme change handler safely
+function registerThemeChangeHandler() {
+  try {
+    const mailbox = window.Office?.context?.mailbox;
+    if (!mailbox || !window.Office.EventType?.OfficeThemeChanged) return;
+
+    mailbox.addHandlerAsync(
+      Office.EventType.OfficeThemeChanged,
+      function (eventArgs) {
+        const theme = eventArgs?.officeTheme;
+        applyOfficeThemeVars(theme);
+      },
+      function (result) {
+        if (result && result.status === Office.AsyncResultStatus.Failed) {
+          console.error('Failed to register theme change handler:', result.error && result.error.message);
+        } else {
+          console.debug('Theme change handler registered.');
+          // if mailbox exposes current theme, try to apply it immediately
+          try {
+            const currentTheme = mailbox.officeTheme;
+            if (currentTheme) applyOfficeThemeVars(currentTheme);
+          } catch { /* ignore */ }
+        }
+      }
+    );
+  } catch (e) {
+    console.warn('Office theming not available or handler registration failed.', e);
+  }
+}
+
 /**
  * Logs a message to the console with a [DEBUG] prefix.
  * @param {string} message - The message to log.
@@ -7,8 +104,10 @@ function log(message) {
 }
 
 // A private variable to hold our configuration data.
-// A Map is used for efficient key-value pair storage and retrieval.
 let configMap = new Map();
+
+// A module-scoped draft string that holds the last-generated HTML draft
+let draft = "";
 
 /**
  * Fetches the config.json file from the specified URL,
@@ -29,9 +128,9 @@ async function loadConfig(url) {
     for (const key in parsedData) {
       configMap.set(key, parsedData[key]);
     }
-  } catch (e) {
-    console.error(`Failed to load configuration: ${e.message}`);
-    throw e;
+  } catch (err) {
+    console.error(`Failed to load configuration: ${err.message}`);
+    throw err;
   }
 }
 
@@ -61,13 +160,34 @@ function getVar(key) {
  */
 function removeHtmlFences(content) {
   const fence = '```html' + String.fromCharCode(10);
-  
-  if (content.startsWith(fence) && content.endsWith('```')) {
+
+  if (typeof content === "string" && content.startsWith(fence) && content.endsWith('```')) {
     return content.slice(fence.length, -3);
   }
-  
+
   return content;
 }
+
+/* -------------------------
+   DOM helpers and UI updates
+   ------------------------- */
+
+/**
+ * Shows an error message in the response container (or alert fallback)
+ * @param {string} msg - message to show
+ */
+function showError(msg) {
+  const rc = document.getElementById("responseContainer");
+  if (rc) {
+    rc.textContent = msg;
+    rc.classList.add("error");
+    rc.setAttribute("role", "alert");
+    try { rc.focus(); } catch { /* ignore focus failures */ }
+  } else {
+    window.alert(msg);
+  }
+}
+
 
 /**
  * Sets the metadata for the email pane.
@@ -84,14 +204,14 @@ function setMetaData(sentiment, urgency, intention) {
   const urgencyIndicator = document.getElementById("urgencyIndicator");
 
   // Updates the UI with the retrieved metadata
-  document.getElementById("sentiment").textContent = sentiment;
-  document.getElementById("urgency").textContent = urgency;
-  document.getElementById("intention").textContent = intention;
+  document.getElementById("sentiment").textContent = sentiment ?? "—";
+  document.getElementById("urgency").textContent = urgency ?? "—";
+  document.getElementById("intention").textContent = intention ?? "—";
 
   // Update urgency indicator color
   if (urgencyIndicator) {
-    urgencyIndicator.classList.remove("urgency-high", "urgency-medium", "urgency-low"); // Reset state
-    const processedUrgency = urgency.trim().toLowerCase();
+    urgencyIndicator.classList.remove("urgency-high", "urgency-medium", "urgency-low", "unknown"); // Reset state
+    const processedUrgency = String(urgency || "").trim().toLowerCase();
 
     if (processedUrgency.includes("high")) {
       urgencyIndicator.classList.add("urgency-high");
@@ -99,44 +219,16 @@ function setMetaData(sentiment, urgency, intention) {
       urgencyIndicator.classList.add("urgency-medium");
     } else if (processedUrgency.includes("low")) {
       urgencyIndicator.classList.add("urgency-low");
+    } else {
+      urgencyIndicator.classList.add("unknown");
     }
   }
   return;
 }
 
-/**
- * Updates the document body styles based on the Office theme.
- * @param {Object} theme - The Office theme object.
- */
-function updateThemeStyles(theme) {
-  if (theme) {
-    document.documentElement.style.setProperty("--bg-color", theme.bodyBackgroundColor);
-    document.documentElement.style.setProperty("--text-color", theme.bodyForegroundColor);
-  }
-}
-
-/**
- * Registers the Office theme change event handler.
- */
-function registerThemeChangeHandler() {
-  const mailbox = Office.context?.mailbox;
-  if (mailbox) {
-    mailbox.addHandlerAsync(
-      Office.EventType.OfficeThemeChanged,
-      (eventArgs) => {
-        const theme = eventArgs.officeTheme;
-        updateThemeStyles(theme);
-      },
-      (result) => {
-        if (result.status === Office.AsyncResultStatus.Failed) {
-          console.error("Failed to register theme change handler:", result.error.message);
-        } else {
-          log("Theme change handler registered successfully.");
-        }
-      }
-    );
-  }
-}
+/* -------------------------
+   API call helpers (retry/backoff)
+   ------------------------- */
 
 /**
  * Calls the custom API to generate a response.
@@ -146,6 +238,7 @@ function registerThemeChangeHandler() {
  */
 async function callCustomEndpoint(userQuery) {
   const apiUrl = getVar("customendpoint_url");
+  if (!apiUrl) throw new Error("customendpoint_url not configured.");
   const payload = {
     query: userQuery,
   };
@@ -284,6 +377,15 @@ async function callGeminiAPI(userQuery, system_instruction) {
   }
 }
 
+/* -------------------------
+   Email helpers
+   ------------------------- */
+
+/**
+ * Retrieves the email body text for the provided item.
+ * @param {Office.Item} item - The mailbox item.
+ * @returns {Promise<string>} The plain text body content.
+ */
 async function getEmailBody(item) {
   return new Promise((resolve, reject) => {
     if (item.body?.getAsync) {
@@ -300,6 +402,130 @@ async function getEmailBody(item) {
   });
 }
 
+/* -------------------------
+   Compose helpers and button wiring
+   ------------------------- */
+
+/**
+ * Returns a sensible suggested subject derived from the item subject.
+ * @param {Office.Item} item - The mailbox item.
+ * @returns {string} The suggested subject line.
+ */
+function getSuggestedSubjectFromItem(item) {
+  try {
+    const subj = item?.subject?.toString ? item.subject.toString() : (item?.subject || "");
+    return subj ? `Re: ${subj}` : "Reply";
+  } catch {
+    return "Reply";
+  }
+}
+
+/**
+ * Opens a compose window using the most appropriate Office.js API available.
+ * Tries displayReplyAllForm, displayReplyForm, then displayNewMessageForm as fallback.
+ * @param {Office.Item} item - The mailbox item to base the compose on.
+ * @param {string} htmlDraft - The HTML content to insert into the compose window.
+ * @param {string} fallbackSubject - Optional subject when opening a new message form.
+ */
+function openComposeWithHtml(item, htmlDraft, fallbackSubject) {
+  const htmlBody = typeof htmlDraft === "string" ? htmlDraft : String(htmlDraft || "<p>—</p>");
+  try {
+    // Preferred: open Reply All compose and inject html
+    if (typeof item.displayReplyAllForm === "function") {
+      try {
+        item.displayReplyAllForm({ htmlBody: htmlBody });
+        log("Opened Reply All compose with suggested draft.");
+        return;
+      } catch (err) {
+        log("displayReplyAllForm threw: " + (err?.message || err));
+        // fall through to other options
+      }
+    }
+
+    // Older hosts may only support reply (not replyAll)
+    if (typeof item.displayReplyForm === "function") {
+      try {
+        item.displayReplyForm({ htmlBody: htmlBody });
+        log("Opened Reply compose with suggested draft.");
+        return;
+      } catch (err) {
+        log("displayReplyForm threw: " + (err?.message || err));
+      }
+    }
+
+    // Fallback: open a new message form (recipients won't be prefilled unless added)
+    if (typeof Office.context.mailbox.displayNewMessageForm === "function") {
+      try {
+        Office.context.mailbox.displayNewMessageForm({
+          htmlBody: htmlBody,
+          subject: fallbackSubject || getSuggestedSubjectFromItem(item),
+        });
+        log("Opened New Message compose with suggested draft.");
+        return;
+      } catch (err) {
+        log("displayNewMessageForm threw: " + (err?.message || err));
+      }
+    }
+
+    // No supported compose API available
+    showError("Unable to open a draft in this Outlook host. Try replying manually.");
+    log("No supported compose APIs available in this host.");
+  } catch (err) {
+    showError("Failed to open draft. See console for details.");
+    console.error("Failed to open draft:", err);
+  }
+}
+
+/* -------------------------
+   DOM wiring for buttons (Quick Reply & Info Button)
+   ------------------------- */
+
+document.addEventListener("DOMContentLoaded", () => {
+  registerThemeChangeHandler();
+  // Ensure Quick Reply button exists and will be enabled by onReady flow
+  const btnQuickReply = document.getElementById("btnQuickReply");
+  if (btnQuickReply) {
+    // The onReady flow will attach the real behavior; keep safe guard here
+    btnQuickReply.disabled = true;
+  }
+
+  // Info button wiring for help link (THIS WAS THE PREVIOUS FIX FOR THE INFO BUTTON)
+  const infoBtn = document.querySelector(".infoBtn");
+  if (infoBtn) {
+    infoBtn.addEventListener("click", () => {
+      try {
+        // Assumes 'helpUrl' is configured in config.json
+        const helpUrl = getVar("helpUrl");
+        if (helpUrl) {
+          window.open(helpUrl, "_blank");
+          log(`Opened help link: ${helpUrl}`);
+        } else {
+            const infoWindow = window.open("", "Info", "width=400,height=250,menubar=no,toolbar=no,location=no");
+            if (infoWindow) {
+              infoWindow.document.write(
+                "<html><head><title>About CommsAssist</title></head><body style='font-family:sans-serif;padding:1em;'>" +
+                "<h2>CommsAssist</h2>" +
+                "<p>Hello! I am your AI assistant for managing email communications.<br>" +
+                "I can help you analyze the sentiment, intention, and urgency of incoming emails, " +
+                "and even draft responses for you.<br><br>" +
+                "Please select an email to get us started!</p>" +
+                "</body></html>"
+              );
+              infoWindow.document.close();
+            }
+        }
+      } catch (err) {
+        console.error("Failed to open help link:", err);
+        showError("Failed to open help link.");
+      }
+    });
+  }
+});
+
+/* -------------------------
+   Main Office onReady flow
+   ------------------------- */
+
 /**
  * The main entry point for the Office Add-in.
  * This function runs when the Office document is ready.
@@ -307,7 +533,7 @@ async function getEmailBody(item) {
 Office.onReady(async (info) => {
   log("Office.js is ready.");
   const configUrl = "config/config.json";
-  
+
   // Load the config file from the specified URL
   try {
     await loadConfig(configUrl);
@@ -321,15 +547,12 @@ Office.onReady(async (info) => {
     log(`Add-in is running in ${info.host} on ${info.platform}.`);
   }
 
-  // Set initial theme
+    // Set initial theme
   const theme = Office.context.officeTheme;
   if (theme) {
-    updateThemeStyles(theme);
+    applyOfficeThemeVars(theme);
   }
-
-  // Register theme change handler after onReady
-  registerThemeChangeHandler();
-
+  
   const item = Office.context?.mailbox?.item;
 
   const helpdeskPrompt = getVar("helpdeskPrompt");
@@ -342,10 +565,11 @@ Office.onReady(async (info) => {
     log("No mail item found. Add-in may be running in an unsupported context.");
     // Hides the main content and disables buttons
     document.getElementById("sentimentContent").classList.add("hidden");
-    document.getElementById("btnQuickReply").disabled = true;
+    const quickBtn = document.getElementById("btnQuickReply");
+    if (quickBtn) quickBtn.disabled = true;
     // Displays a message to the user
-    document.getElementById("responseContainer").textContent =
-      "This add-in only works with email messages.";
+    const rc = document.getElementById("responseContainer");
+    if (rc) rc.textContent = "This add-in only works with email messages.";
     return; // Stop execution if no item is available
   }
 
@@ -355,25 +579,23 @@ Office.onReady(async (info) => {
   const isReadMode = item.itemType === Office.MailboxEnums.ItemType.Message;
   const isComposeMode = item.itemType === Office.MailboxEnums.ItemType.MessageCompose;
 
-  // Declaring draft variable here to be available to all listeners
-  let draft = "";
-
   if (isReadMode) {
     log("In READ mode.");
-    // Shows the read mode UI and enables the buttons
+    // Shows the read mode UI and enables the Quick Reply button
     document.getElementById("sentimentContent").classList.remove("hidden");
-    document.getElementById("btnQuickReply").disabled = false;
+    const quickBtn = document.getElementById("btnQuickReply");
+    if (quickBtn) quickBtn.disabled = false;
 
     // Wait for the email body to be retrieved first
     const emailBody = (await getEmailBody(item)).trim();
 
-    // Now that the 'preview' element is populated, you can safely proceed.
-    document.getElementById("responseContainer").innerHTML =
-      "Analyzing email content, please wait...";
+    // Now that the 'preview' element is populated, proceed.
+    const rc = document.getElementById("responseContainer");
+    if (rc) rc.innerHTML = "Analyzing email content, please wait...";
 
     let name = "";
     if (item.from) {
-      name = item.from.displayName || item.from.emailAddress;
+      name = item.from.displayName || item.from.emailAddress || "";
     }
 
     try {
@@ -382,30 +604,22 @@ Office.onReady(async (info) => {
         const query = {
           fromEmailAddress: name,
           subject: item.subject ? item.subject : "Unknown",
-          body: emailBody, // Use the variable with the body content
+          body: emailBody,
         };
         const responseData = await callCustomEndpoint(query);
-        log(`Call response: ${responseData}`);
+        log(`Call response: ${JSON.stringify(responseData)}`);
 
-        let sentiment = responseData.response.metadata.email_sentiment;
-        let urgency = responseData.response.metadata.email_urgency;
-        let intention = responseData.response.metadata.email_intention;
-        draft = removeHtmlFences(responseData.response.answer.email_draft);
-        /*         
-        let htmlResponse = "Analysis complete. I am ready to help you generate a draft.";
-        let comments = responseData.response.metadata.email_review_comments;
-        if (comments && comments !== "No further comments.") {
-          htmlResponse += // Maybe use this one day...
-            "Analysis complete. I am ready to help you generate a draft."+
-            "<br><br>By the way, some review comments were identified that might help you."+
-            "<br><br><b>Comments:</b><br>" + comments;
-        }  
-        */
+        // Safely read expected values with guards
+        let sentiment = responseData?.response?.metadata?.email_sentiment ?? "Unknown";
+        let urgency = responseData?.response?.metadata?.email_urgency ?? "Unknown";
+        let intention = responseData?.response?.metadata?.email_intention ?? "Unknown";
+        draft = removeHtmlFences(responseData?.response?.answer?.email_draft ?? "");
+
         document.getElementById("responseContainer").innerHTML =
-          "Analysis complete. Please click 'Quick Reply' generate a draft.";
+          "Analysis complete. Please click 'Quick Reply' to generate a draft.";
         setMetaData(sentiment, urgency, intention);
       } else {
-        // Retrieves additional email metadata asynchronously
+        // No custom endpoint: call Gemini for metadata
         let sentiment = "Unknown";
         let urgency = "Unknown";
         let intention = "Unknown";
@@ -415,84 +629,88 @@ Office.onReady(async (info) => {
           const prompt = `From: ${name}\nBody: ${emailBody}`;
           sentiment = await callGeminiAPI(prompt, sentimentPrompt);
           log(`Sentiment analysis result: ${sentiment}`);
-        } catch (error) {
-          log(`Error analyzing sentiment: ${error.message}`);
+        } catch (err) {
+          log(`Error analyzing sentiment: ${err.message}`);
         }
         // Calls the Gemini API to analyze urgency
         try {
-          const prompt = `
-            From: ${document.getElementById("from").textContent}
-            Body: ${emailBody}`;
+          const prompt = `From: ${name}\nBody: ${emailBody}`;
           urgency = await callGeminiAPI(prompt, urgencyPrompt);
           log(`Urgency analysis result: ${urgency}`);
-        } catch (error) {
-          console.error(`Error analyzing urgency: ${error.message}`);
-          log(`Error analyzing urgency: ${error.message}`);
+        } catch (err) {
+          console.error(`Error analyzing urgency: ${err.message}`);
+          log(`Error analyzing urgency: ${err.message}`);
         }
         // Calls the Gemini API to analyze intention
         try {
-          const prompt = `
-            From: ${document.getElementById("from").textContent}
-            Body: ${emailBody}`;
+          const prompt = `From: ${name}\nBody: ${emailBody}`;
           intention = await callGeminiAPI(prompt, intentionPrompt);
           log(`Intention analysis result: ${intention}`);
-        } catch (error) {
-          console.error(`Error analyzing intention: ${error.message}`);
-          log(`Error analyzing intention: ${error.message}`);
+        } catch (err) {
+          console.error(`Error analyzing intention: ${err.message}`);
+          log(`Error analyzing intention: ${err.message}`);
         }
-        // ... (rest of Gemini API calls for urgency and intention)
+
         document.getElementById("responseContainer").innerHTML =
-          "Analysis complete. Please click 'Quick Reply' generate a draft.";
+          "Analysis complete. Please click 'Quick Reply' to generate a draft.";
 
         setMetaData(sentiment, urgency, intention);
       }
-    } catch (error) {
-      log(`Error calling endpoint: ${error.message}`);
-      console.error(`Error calling endpoint: ${error.message}`);
+    } catch (err) {
+      log(`Error calling endpoint: ${err.message}`);
+      console.error(`Error calling endpoint: ${err.message}`);
+      showError("Analysis failed. See console for details.");
     }
 
-    // Event listener for the 'Quick Reply' button
-    document.getElementById("btnQuickReply").addEventListener("click", async () => {
-      // Disables the button and shows a loading message
-      document.getElementById("btnQuickReply").disabled = true;
-      document.getElementById("responseContainer").innerHTML = "Generating draft...";
+    // Event listener for the 'Quick Reply' button (generates and immediately opens a reply)
+    const quickReplyBtn = document.getElementById("btnQuickReply");
+    if (quickReplyBtn) {
+      quickReplyBtn.addEventListener("click", async () => {
+        // Disables the button and shows a loading message
+        quickReplyBtn.disabled = true;
+        const rc2 = document.getElementById("responseContainer");
+        if (rc2) rc2.innerHTML = "Generating draft...";
 
-      try {
-        if (customEndpointUrl === "") {
-          const prompt = `From: ${name}\nBody: ${emailBody}`;
-          // Calls the Gemini API to generate the draft
-          const generatedText = await callGeminiAPI(prompt, helpdeskPrompt);
-          draft = generatedText;
+        try {
+          if (customEndpointUrl === "") {
+            const prompt = `From: ${name}\nBody: ${emailBody}`;
+            // Calls the Gemini API to generate the draft
+            const generatedText = await callGeminiAPI(prompt, helpdeskPrompt);
+            draft = generatedText;
+          }
+        } catch (err) {
+          draft = "<html><body><p>Error generating draft. Please try again.</p></body></html>";
+          log(`Error generating draft: ${err.message}`);
+          console.error(`Error generating draft: ${err.message}`);
+        } finally {
+          // Re-enables the button and informs user
+          quickReplyBtn.disabled = false;
+          if (rc2) rc2.innerHTML = "Draft generated successfully. Opening compose window...";
         }
-      } catch (error) {
-        draft = "<html><body><p>Error generating draft. Please try again.</p></body></html>";
-        log(`Error generating draft: ${error.message}`);
-        console.error(`Error generating draft: ${error.message}`);
-      } finally {
-        // Re-enables the button
-        document.getElementById("btnQuickReply").disabled = false;
-        document.getElementById("responseContainer").innerHTML = "Draft generated successfully.";
-      }
-      // Displays the generated draft in a reply form with HTML coercion
-      if (item.displayReplyAllForm) {
-        item.displayReplyAllForm(draft, {
-          coercionType: Office.CoercionType.Html,
-        });
-      }
-    });
+
+        // Ensure draft is a string and sanitized for insertion
+        const htmlDraft = typeof draft === "string" ? draft : String(draft || "<p></p>");
+        const cleanedDraft = removeHtmlFences(htmlDraft);
+
+        // Try to open compose with HTML in a robust order
+        openComposeWithHtml(item, cleanedDraft, getSuggestedSubjectFromItem(item));
+      });
+    }
   } else if (isComposeMode) {
     log("In COMPOSE mode.");
     // Hides the main content and disables buttons for compose mode
     document.getElementById("sentimentContent").classList.add("hidden");
-    document.getElementById("btnQuickReply").disabled = true;
-    document.getElementById("responseContainer").innerHTML =
-      "This functionality is not available in compose mode.";
+    const quickBtn = document.getElementById("btnQuickReply");
+    if (quickBtn) quickBtn.disabled = true;
+    const rc = document.getElementById("responseContainer");
+    if (rc) rc.innerHTML = "This functionality is not available in compose mode.";
   } else {
     log("In an unsupported mode.");
     // Hides the main content and disables buttons for unsupported modes
     document.getElementById("sentimentContent").classList.add("hidden");
-    document.getElementById("btnQuickReply").disabled = true;
-    document.getElementById("responseContainer").innerHTML =
-      "This add-in only works with email messages.";
+    const quickBtn = document.getElementById("btnQuickReply");
+    if (quickBtn) quickBtn.disabled = true;
+    const rc = document.getElementById("responseContainer");
+    if (rc) rc.textContent = "This add-in only works with email messages.";
   }
 });

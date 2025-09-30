@@ -1,31 +1,40 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Communications Assistant</title>
-    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-    <link rel="stylesheet" href="./pane.css" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Communications Assistant</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="./pane.css" />
 </head>
 <body>
-    <div class="header">
-        <h3>Communications Assistant</h3>
-        <span class="infoIcon" title="Hello! I am your AI assistant for managing email communications. I can help you analyze the sentiment, intention, and urgency of incoming emails, and even draft responses for you. Please select an email to get us started!">&#x2139;</span>
+  <header class="header" role="banner">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">CA</div>
+      <h1 class="title">Communications Assistant</h1>
     </div>
-    <div class="card" id="sentimentContent">
-        <div><strong>Sentiment:</strong> <span id="sentiment">—</span></div>
-        <div><strong>Intention:</strong> <span id="intention">—</span></div>
-        <div>
-            <strong>Urgency:</strong>
-            <span id="urgencyIndicator"></span>
-            <span id="urgency">—</span>
-        </div>
+    <button class="infoBtn" aria-label="Assistant help" title="Open help">ℹ️</button>
+  </header>
+
+  <section class="card" id="sentimentContent" aria-live="polite">
+    <div class="row"><strong>Sentiment</strong><span id="sentiment" class="muted">—</span></div>
+    <div class="row"><strong>Intention</strong><span id="intention" class="muted">—</span></div>
+    <div class="row">
+      <strong>Urgency</strong>
+      <div class="urgencyGroup">
+        <span id="urgencyIndicator" class="urgency-indicator unknown" aria-hidden="true"></span>
+        <span id="urgency" class="muted">—</span>
+      </div>
     </div>
-    <div class="card" id="quick-reply-card">
-        <button id="btnQuickReply">Quick Reply</button>
-        <small class="blockSmall"> Opens a reply-all window with a suggested draft. </small>
-    </div>
-    <div id="responseContainer"></div>
-    <script src="./pane.js"></script>
+  </section>
+
+  <section class="card actions" aria-label="Quick actions">
+    <button id="btnQuickReply" class="primary">Quick Reply</button>
+    <small class="hint">Opens a reply-all with a suggested draft.</small>
+  </section>
+
+  <div id="responseContainer" class="response" role="region" aria-label="Suggested reply"></div>
+
+  <script src="./pane.js"></script>
 </body>
 </html>
