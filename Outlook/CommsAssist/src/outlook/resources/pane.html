@@ -31,6 +31,22 @@
   <section class="card actions" aria-label="Quick actions">
     <button id="btnQuickReply" class="primary">Quick Reply</button>
     <small class="hint">Opens a reply-all with a suggested draft.</small>
+    <section class="card chatbot-card">
+    <div class="chat-header">
+        <strong>Chat Assistant</strong>
+        <button id="toggleChatBtn" class="toggle-button" aria-expanded="false" aria-controls="chatContent">
+        <span class="arrow-down" aria-hidden="true">▼</span>
+        </button>
+    </div>
+    <div id="chatContent" class="chat-content hidden">
+        <div id="chatHistory" class="chat-history">
+        </div>
+        <div class="chat-input-area">
+        <input type="text" id="chatInput" placeholder="Ask a question..." aria-label="Chat input">
+        <button id="chatSendBtn" class="primary" title="Send message">Send</button>
+        </div>
+    </div>
+    </section>
   </section>
 
   <div id="responseContainer" class="response" role="region" aria-label="Suggested reply"></div>

@@ -2,6 +2,7 @@
     "customendpoint_url": "<ENTERENDPOINTHERE>",
     "endpoint_url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=",
     "google_api_key": "<ENTERYOUCODEHERE>",
+    "chatSystemPrompt": "You are a helpful, brief, and friendly assistant named 'Communications Assistant'. Answer the user's question concisely in one paragraph. Do not reference the current email.",
     "helpdeskPrompt": [
         "You are an automated IT helpdesk email chatbot for a corporate IT support desk.",
         "You refer to yourself as HelpBot. You know everything about common IT problems.",

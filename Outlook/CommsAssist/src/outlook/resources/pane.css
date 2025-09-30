@@ -138,3 +138,103 @@ button:focus{outline:3px solid rgba(15,100,255,0.16);}
   *{forced-color-adjust: none}
   .logo{background:CanvasText;color:Canvas}
 }
+
+/* --- Chatbot Styles --- */
+.chatbot-card {
+  padding: 0; /* Remove padding from the card itself */
+  margin-bottom: 12px;
+}
+
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--pad); /* Use card padding for the header */
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+/* Toggle button styling */
+.toggle-button {
+  all: unset; /* Remove all default button styles */
+  cursor: pointer;
+  padding: 4px; /* Make the click target larger */
+}
+.toggle-button:focus {
+  outline: 3px solid var(--accent);
+  opacity: 0.8;
+  border-radius: 4px;
+}
+
+/* Arrow rotation for visual feedback */
+.toggle-button[aria-expanded="true"] .arrow-down {
+  transform: rotate(180deg);
+}
+
+.arrow-down {
+  display: inline-block;
+  transition: transform 0.2s ease-in-out;
+  color: var(--text);
+  font-size: 10px;
+}
+
+/* Chat content (collapsible) */
+.chat-content {
+  padding: var(--pad);
+  border-top: 1px solid var(--border);
+}
+
+/* Chat history/log */
+.chat-history {
+  max-height: 200px; /* Limit history height */
+  overflow-y: auto;
+  margin-bottom: var(--gap);
+  padding-right: 5px; /* Space for scrollbar */
+}
+
+/* Message bubble styles */
+.message {
+  margin-bottom: 8px;
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  line-height: 1.3;
+}
+.user-message {
+  background-color: var(--accent);
+  color: white;
+  margin-left: auto;
+  text-align: right;
+  border-bottom-right-radius: 4px;
+}
+.ai-message {
+  background-color: var(--border);
+  color: var(--text);
+  margin-right: auto;
+  border-bottom-left-radius: 4px;
+}
+/* Ensure dark theme contrast for AI messages */
+html[data-theme='dark'] .ai-message {
+  background-color: var(--surface);
+}
+
+/* Chat input area */
+.chat-input-area {
+  display: flex;
+  gap: var(--gap);
+}
+#chatInput {
+  flex-grow: 1;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+#chatInput:focus {
+  outline: 2px solid var(--accent);
+}
+#chatSendBtn {
+  flex-shrink: 0;
+}

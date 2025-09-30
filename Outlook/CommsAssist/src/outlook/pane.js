@@ -96,6 +96,21 @@ function registerThemeChangeHandler() {
 }
 
 /**
+ * Appends a message to the chat history UI.
+ * @param {string} text - The content of the message.
+ * @param {string} sender - 'user' or 'ai'.
+ */
+function appendMessage(text, sender) {
+  const history = document.getElementById("chatHistory");
+  const messageEl = document.createElement("div");
+  messageEl.classList.add("message", `${sender}-message`);
+  messageEl.textContent = text;
+  history.appendChild(messageEl);
+  // Scroll to the bottom to show the newest message
+  history.scrollTop = history.scrollHeight;
+}
+
+/**
  * Logs a message to the console with a [DEBUG] prefix.
  * @param {string} message - The message to log.
  */
@@ -476,6 +491,46 @@ function openComposeWithHtml(item, htmlDraft, fallbackSubject) {
   }
 }
 
+/**
+ * Handles the user's chat query, calls the Gemini API, and updates the chat.
+ */
+async function handleChatQuery() {
+  const input = document.getElementById("chatInput");
+  const sendBtn = document.getElementById("chatSendBtn");
+  const query = input.value.trim();
+
+  if (!query) return;
+
+  // Disable input/button and show loading
+  input.disabled = true;
+  sendBtn.disabled = true;
+  input.value = ""; // Clear input immediately
+  appendMessage(query, "user");
+  
+  // Placeholder/Loading message
+  appendMessage("Thinking...", "ai");
+  const lastAiMessage = document.getElementById("chatHistory").lastChild;
+
+  try {
+    const chatSystemInstruction = getVar("chatSystemPrompt") || "You are a helpful and concise assistant. Answer the user's question directly.";
+    
+    // Use the existing, reliable callGeminiAPI function
+    const aiResponse = await callGeminiAPI(query, chatSystemInstruction);
+
+    // Update the last message with the actual response
+    lastAiMessage.textContent = aiResponse;
+  } catch (err) {
+    lastAiMessage.textContent = "Error: Could not connect to the assistant.";
+    console.error("Chat API error:", err);
+  } finally {
+    // Re-enable input/button
+    input.disabled = false;
+    sendBtn.disabled = false;
+    input.focus();
+    document.getElementById("chatHistory").scrollTop = document.getElementById("chatHistory").scrollHeight;
+  }
+}
+
 /* -------------------------
    DOM wiring for buttons (Quick Reply & Info Button)
    ------------------------- */
@@ -517,6 +572,32 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (err) {
         console.error("Failed to open help link:", err);
         showError("Failed to open help link.");
+      }
+    });
+  }
+
+  const toggleBtn = document.getElementById("toggleChatBtn");
+  const chatContent = document.getElementById("chatContent");
+  const chatSendBtn = document.getElementById("chatSendBtn");
+  const chatInput = document.getElementById("chatInput");
+
+  if (toggleBtn && chatContent) {
+    // Event handler for the entire header to be a click target
+    document.querySelector('.chat-header').addEventListener("click", () => {
+      const isExpanded = chatContent.classList.toggle("hidden");
+      toggleBtn.setAttribute("aria-expanded", !isExpanded);
+    });
+  }
+
+  if (chatSendBtn) {
+    chatSendBtn.addEventListener("click", handleChatQuery);
+  }
+
+  if (chatInput) {
+    chatInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault(); // Prevent accidental form submission
+        handleChatQuery();
       }
     });
   }
