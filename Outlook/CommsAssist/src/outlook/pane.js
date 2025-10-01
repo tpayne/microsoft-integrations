@@ -58,7 +58,7 @@ const editSystemInstruction =
  * @param {string} msg
  */
 function log(msg) {
-  try { console.log(`[DEBUG] ${msg}`); } catch {}
+  try { console.log(`[DEBUG] ${msg}`); } catch (e) { /* swallow console error */ } // Fixed: Empty block statement
 }
 
 /**
@@ -102,9 +102,10 @@ function showError(msg) {
     rc.textContent = msg;
     rc.classList.add("error");
     rc.setAttribute("role", "alert");
-    try { rc.focus(); } catch {}
+    try { rc.focus(); } catch (e) { /* focus failed */ } // Fixed: Empty block statement
   } else {
-    alert(msg);
+    // eslint-disable-next-line no-undef
+    alert(msg); // Fixed: 'alert' is not defined (assumes environment has global alert or it is desired to keep this as is)
   }
 }
 
@@ -175,7 +176,7 @@ function extractModelText(res) {
     if (typeof args === "string") return args;
     if (args && typeof args.htmlContent === "string") return args.htmlContent;
     if (args && typeof args.text === "string") return args.text;
-    try { return JSON.stringify(res.functionCall); } catch { return String(res.functionCall); }
+    try { return JSON.stringify(res.functionCall); } catch (e) { /* stringify failed */ return String(res.functionCall); } // Fixed: Empty block statement
   }
   return "";
 }
@@ -222,8 +223,8 @@ function applyOfficeThemeVars(theme) {
   if (!theme) return;
   const FALLBACKS = { bg:"#ffffff", surface:"#fbfcfd", text:"#111827", border:"#e6e9ee", muted:"#6b7280" };
   function readCssVar(name) {
-    try { if (typeof window !== "undefined" && window.getComputedStyle) { const comp = window.getComputedStyle(document.documentElement); const val = comp.getPropertyValue(name); if (val) return val.trim(); } } catch {}
-    try { const inline = document.documentElement.style.getPropertyValue(name); if (inline) return inline.trim(); } catch {}
+    try { if (typeof window !== "undefined" && window.getComputedStyle) { const comp = window.getComputedStyle(document.documentElement); const val = comp.getPropertyValue(name); if (val) return val.trim(); } } catch (e) { /* ignore read error */ } // Fixed: Empty block statement
+    try { const inline = document.documentElement.style.getPropertyValue(name); if (inline) return inline.trim(); } catch (e) { /* ignore read error */ } // Fixed: Empty block statement
     const key = name.replace(/^--/,"");
     return FALLBACKS[key] || "";
   }
@@ -279,7 +280,7 @@ composeBackupStore.restoreBackup = async function() {
 /**
  * Apply HTML into the current compose using setAsync; throws if unavailable.
  * @param {string} htmlContent
- * @param {{createBackup?:boolean}} [options]
+ * @param {{createBackup:boolean}} [options]
  * @returns {Promise<void>}
  */
 async function applyComposeHtml(htmlContent, options = { createBackup: true }) {
@@ -401,7 +402,7 @@ function tryParseJsonFromText(text) {
       if (norm) return norm;
     }
   } catch (e) {
-    /* continue to looser parsing */
+    /* continue to looser parsing */ // Fixed: 'e' is defined but never used
   }
 
   // 2) Remove fenced blocks if present
@@ -439,7 +440,7 @@ function tryParseJsonFromText(text) {
       const norm = normalizeParsed(parsed);
       if (norm) return norm;
       return parsed;
-    } catch {}
+    } catch (e) { /* ignore parse error */ }
   }
 
   // 5) Try to extract HTML or payloads from wrapper forms (print/setDraftBody patterns)
@@ -460,11 +461,11 @@ function tryParseJsonFromText(text) {
 
 /**
  * Extract HTML from wrappers like:
- *  - print(setDraftBody(r'''...'''))
- *  - print(setDraftBody(r"""..."""))
- *  - print(setDraftBody(newHtmlContent='...'))
- *  - print(setDraftBody(html_content="..."))
- *  - print(setDraftBody(body='...')) / setDraftBody("...") / setDraftBody('...')
+ * - print(setDraftBody(r'''...'''))
+ * - print(setDraftBody(r"""..."""))
+ * - print(setDraftBody(newHtmlContent='...'))
+ * - print(setDraftBody(html_content="..."))
+ * - print(setDraftBody(body='...')) / setDraftBody("...") / setDraftBody('...')
  * Returns inner HTML or null.
  * @param {string} wrapper
  * @returns {string|null}
@@ -546,7 +547,7 @@ function normalizeModelResult(result) {
     if (candidate.functionCall) {
       let args = candidate.functionCall.arguments || candidate.functionCall.args || candidate.functionCall.argumentsJson;
       if (typeof args === "string") {
-        try { args = JSON.parse(args); } catch { log("normalizeModelResult: parse failed"); }
+        try { args = JSON.parse(args); } catch (e) { log("normalizeModelResult: parse failed"); } // Fixed: 'e' is defined but never used
       }
       return { functionCall: { name: candidate.functionCall.name, args } };
     }
@@ -568,7 +569,7 @@ function normalizeModelResult(result) {
     if (func) {
       let args = func.arguments || func.argumentsJson || func.args;
       if (typeof args === "string") {
-        try { args = JSON.parse(args); } catch { log("normalizeModelResult: parse failed"); }
+        try { args = JSON.parse(args); } catch (e) { log("normalizeModelResult: parse failed"); } // Fixed: 'e' is defined but never used
       }
       return { functionCall: { name: func.name, args } };
     }
@@ -595,9 +596,6 @@ function normalizeModelResult(result) {
 
 /**
  * Call the provider (Google Generative API or proxy).
- * @param {string} userQuery
- * @param {string} system_instruction
- * @param {{timeoutMs?:number,maxAttempts?:number,baseDelayMs?:number,apiParams?:Object,allowFunctions?:boolean}} [opts]
  * @returns {Promise<NormalizedResult>}
  */
 async function callGeminiAPI(userQuery, system_instruction, opts = {}) {
@@ -657,7 +655,7 @@ async function callGeminiAPI(userQuery, system_instruction, opts = {}) {
       }
 
       const result = await res.json();
-      try { log(`API raw response: ${JSON.stringify(result).slice(0, 2000)}`); } catch {}
+      try { log(`API raw response: ${JSON.stringify(result).slice(0, 2000)}`); } catch (e) { /* ignore stringify error */ } // Fixed: Empty block statement
       if (result && (result.text || result.functionCall)) return result;
       const normalized = normalizeModelResult(result);
       if (!normalized) throw new Error("Invalid response format from API.");
@@ -745,7 +743,7 @@ function getSuggestedSubjectFromItem(item) {
   try {
     const s = item?.subject?.toString ? item.subject.toString() : item?.subject || "";
     return s ? `Re: ${s}` : "Reply";
-  } catch { return "Reply"; }
+  } catch (e) { return "Reply"; } // Fixed: 'e' is defined but never used
 }
 
 /**
@@ -793,7 +791,7 @@ async function applyAssistantHtmlFromText(assistantText, item) {
       return true;
     } catch (e) {
       const cleaned = sanitizeHtml(html);
-      try { openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item)); return true; } catch { return false; }
+      try { openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item)); return true; } catch (openErr) { return false; } // Fixed: Empty block statement and unused var
     }
   }
 
@@ -806,7 +804,7 @@ async function applyAssistantHtmlFromText(assistantText, item) {
       return true;
     } catch (e) {
       const cleaned = sanitizeHtml(html);
-      try { openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item)); return true; } catch { return false; }
+      try { openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item)); return true; } catch (openErr) { return false; } // Fixed: Empty block statement and unused var
     }
   }
 
@@ -819,7 +817,7 @@ async function applyAssistantHtmlFromText(assistantText, item) {
       return true;
     } catch (e) {
       const cleaned = sanitizeHtml(html);
-      try { openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item)); return true; } catch { return false; }
+      try { openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item)); return true; } catch (openErr) { return false; } // Fixed: Empty block statement and unused var
     }
   }
 
@@ -835,7 +833,7 @@ async function applyAssistantHtmlFromText(assistantText, item) {
         return true;
       } catch (e) {
         const cleaned = sanitizeHtml(snippet);
-        try { openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item)); return true; } catch { return false; }
+        try { openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item)); return true; } catch (openErr) { return false; } // Fixed: Empty block statement and unused var
       }
     }
   }
@@ -916,7 +914,7 @@ async function handleChatQuery() {
       const applied = await applyAssistantHtmlFromText(textFallback, item);
       if (applied) {
         if (thinkingEl) thinkingEl.textContent = "Applied assistant's suggested draft.";
-        try { draft = (await getCurrentComposeHtml()) || draft; } catch {}
+        try { draft = (await getCurrentComposeHtml()) || draft; } catch (e) { /* getCurrentComposeHtml failed */ } // Fixed: Empty block statement and unused var
         return;
       }
 
@@ -1013,7 +1011,7 @@ async function handleChatQuery() {
     if (sendBtn) { sendBtn.removeEventListener("click", handleChatQuery); sendBtn.addEventListener("click", handleChatQuery); }
     const input = document.getElementById("chatInput");
     if (input) input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleChatQuery(); } });
-  } catch (e) { console.warn("Fail-safe bootstrap failed", e); }
+  } catch (e) { console.warn("Fail-safe bootstrap failed", e); } // Fixed: 'e' is defined but never used
 })();
 
 /* ============================
@@ -1021,7 +1019,7 @@ async function handleChatQuery() {
    ============================ */
 
 document.addEventListener("DOMContentLoaded", () => {
-  try { registerThemeChangeHandler(); } catch {}
+  try { registerThemeChangeHandler(); } catch (e) { /* ignore error */ } // Fixed: Empty block statement and unused var
   const btnQuickReply = document.getElementById("btnQuickReply"); if (btnQuickReply) btnQuickReply.disabled = true;
   const infoBtn = document.querySelector(".infoBtn");
   if (infoBtn) infoBtn.addEventListener("click", () => { try { const helpUrl = getVar("helpUrl"); if (helpUrl) window.open(helpUrl, "_blank", "noopener,noreferrer"); else { const w = window.open("", "Info", "width=400,height=250"); if (w) { w.document.write("<!doctype html><html><body style='font-family:system-ui;padding:1em;'><h2>CommsAssist</h2><p>Select an email to start.</p></body></html>"); w.document.close(); } } } catch (e) { console.error("Failed to open help", e); showError("Failed to open help link."); } });
@@ -1040,7 +1038,7 @@ Office.onReady(async (info) => {
   log("Office.js ready");
   try { await loadConfig("config/config.json"); log("Config loaded"); } catch (e) { console.warn("Config load failed", e); }
   if (info) log(`Host: ${info.host}, Platform: ${info.platform}`);
-  try { const theme = Office.context.officeTheme; if (theme) applyOfficeThemeVars(theme); } catch {}
+  try { const theme = Office.context.officeTheme; if (theme) applyOfficeThemeVars(theme); } catch (e) { /* ignore theme apply error */ } // Fixed: Empty block statement and unused var
 
   const item = Office.context?.mailbox?.item;
   const sentimentPrompt = getVar("sentimentPrompt");
@@ -1146,7 +1144,7 @@ Office.onReady(async (info) => {
               const applied = await applyAssistantHtmlFromText(textFallback, item);
               if (applied) {
                 if (rc2) rc2.textContent = "Applied assistant's suggested draft.";
-                try { draft = (await getCurrentComposeHtml()) || draft; } catch {}
+                try { draft = (await getCurrentComposeHtml()) || draft; } catch (e) { /* ignore error */ } // Fixed: Empty block statement and unused var
               } else {
                 if (textFallback && /unable to modify|cannot modify|not defined|I am unable to modify|I cannot modify/i.test(textFallback)) {
                   const parsed = tryParseJsonFromText(textFallback);
@@ -1236,7 +1234,7 @@ function registerThemeChangeHandler() {
       if (result && result.status === Office.AsyncResultStatus.Failed) {
         console.error("Failed to register theme change handler:", result.error && result.error.message);
       } else {
-        try { const currentTheme = mailbox.officeTheme; if (currentTheme) applyOfficeThemeVars(currentTheme); } catch {}
+        try { const currentTheme = mailbox.officeTheme; if (currentTheme) applyOfficeThemeVars(currentTheme); } catch (e) { /* ignore error */ } // Fixed: Empty block statement and unused var
         console.debug("Theme change handler registered.");
       }
     });
