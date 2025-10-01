@@ -27,39 +27,101 @@
     <section>
         <article>
             <pre class="prettyprint source linenums"><code>/**
- * Logs a message to the console with a [DEBUG] prefix.
- * @param {string} message - The message to log.
+ * CommsAssist main script (complete)
+ * - Copy this file as-is to your add-in JS bundle.
+ * - Requires a server-side proxy at getVar("proxy_gen_endpoint") or DEFAULT_PROXY_ENDPOINT.
+ * - Production note: replace sanitizeHtml with DOMPurify server-side or client-side sanitization.
+ */
+
+/* ============================
+   JSDoc typedefs (parser-friendly)
+   ============================ */
+
+/**
+ * ComposeBackupStore shape used by the module
+ * @typedef {Object} ComposeBackupStore
+ * @property {string|null} lastBackup
+ * @property {function():Promise&lt;void>} [saveBackup] - saves the current compose HTML
+ * @property {function():Promise&lt;boolean>} [restoreBackup] - restores the last backup, resolves true on success
+ */
+
+/**
+ * Options for setDraftBody
+ * @typedef {Object} SetDraftOptions
+ * @property {boolean} [createBackup] - whether to save a backup before applying the draft
+ */
+
+/**
+ * Normalized model result when returned by the proxy or normalized by the client
+ * @typedef {Object} NormalizedResult
+ * @property {string} [text] - plain text response from the model
+ * @property {{name: string, args: any}} [functionCall] - function call payload when model requests an action
+ */
+
+/**
+ * Options for callGeminiAPI
+ * @typedef {Object} CallGeminiOptions
+ * @property {number} [timeoutMs]
+ * @property {number} [maxAttempts]
+ * @property {number} [baseDelayMs]
+ * @property {Object} [apiParams]
+ */
+
+/* ============================
+   Config, state, and constants
+   ============================ */
+
+/** @type {Map&lt;string, any>} */
+let configMap = new Map();
+
+/** @type {string} Last generated HTML draft (module-scoped) */
+let draft = "";
+
+/** @type {ComposeBackupStore} */
+const composeBackupStore = { lastBackup: null };
+
+const HISTORY_CAP = 50;
+const DEFAULT_PROXY_ENDPOINT = "/api/gen"; // change if your proxy URL differs
+const REQUEST_TIMEOUT_MS = 30000;
+
+/* ============================
+   Utilities and DOM helpers
+   ============================ */
+
+/**
+ * Logs a debug message to the console.
+ * @param {string} message
  */
 function log(message) {
   console.log(`[DEBUG] ${message}`);
 }
 
-// A private variable to hold our configuration data.
-// A Map is used for efficient key-value pair storage and retrieval.
-let configMap = new Map();
-
-// A module-scoped draft string that holds the last-generated HTML draft
-let draft = "";
+/**
+ * Retrieves a value from the loaded config map.
+ * If the value is an array it joins with newline.
+ * @param {string} key
+ * @returns {any}
+ */
+function getVar(key) {
+  if (configMap.size !== 0) {
+    const value = configMap.get(key);
+    if (Array.isArray(value)) return value.join(String.fromCharCode(10));
+    return value;
+  }
+  return "";
+}
 
 /**
- * Fetches the config.json file from the specified URL,
- * parses the JSON, and loads the key-value pairs into a map.
- * This is an asynchronous operation.
- * @param {string} url The URL of the config.json file.
- * @returns {Promise&lt;void>} A promise that resolves when the config is loaded.
+ * Loads a JSON config file and stores its key/values in configMap.
+ * @param {string} url - URL to config.json
+ * @returns {Promise&lt;void>}
  */
 async function loadConfig(url) {
   try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const parsedData = await response.json();
-
-    // Unpack the key-value pairs into the global map
-    for (const key in parsedData) {
-      configMap.set(key, parsedData[key]);
-    }
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    const parsedData = await res.json();
+    for (const key in parsedData) configMap.set(key, parsedData[key]);
   } catch (err) {
     console.error(`Failed to load configuration: ${err.message}`);
     throw err;
@@ -67,46 +129,9 @@ async function loadConfig(url) {
 }
 
 /**
- * Retrieves a value from the configuration map using its key.
- * @param {string} key The key to look up in the config.
- * @returns {*} The value associated with the key, or undefined if the key is not found.
- */
-function getVar(key) {
-  if (configMap.size !== 0) {
-    const value = configMap.get(key);
-    // If the value is an array, join its elements with a newline character.
-    if (Array.isArray(value)) {
-      return value.join(String.fromCharCode(10));
-    }
-    return value;
-  }
-  return "";
-}
-
-/**
- * Removes the leading and trailing triple-backtick 'html' fences from a string.
- * This is useful for cleaning up code blocks formatted with Markdown.
- *
- * @param {string} content - The string that may contain the HTML fences.
- * @returns {string} The string with the fences removed.
- */
-function removeHtmlFences(content) {
-  const fence = '```html' + String.fromCharCode(10);
-
-  if (typeof content === "string" &amp;&amp; content.startsWith(fence) &amp;&amp; content.endsWith('```')) {
-    return content.slice(fence.length, -3);
-  }
-
-  return content;
-}
-
-/* -------------------------
-   DOM helpers and UI updates
-   ------------------------- */
-
-/**
- * Shows an error message in the response container (or alert fallback)
- * @param {string} msg - message to show
+ * Shows an error message in the response container (or alert if missing).
+ * @param {string} msg
+ * @returns {void}
  */
 function showError(msg) {
   const rc = document.getElementById("responseContainer");
@@ -114,49 +139,167 @@ function showError(msg) {
     rc.textContent = msg;
     rc.classList.add("error");
     rc.setAttribute("role", "alert");
-    try { rc.focus(); } catch { /* ignore focus failures */ }
+    try {
+      rc.focus();
+    } catch (e) {
+      // Focus may fail in some hosts; ignore
+      log("showError: focus failed ",e);
+    }
   } else {
     window.alert(msg);
   }
 }
 
 /**
- * Updates the document body styles based on the Office theme.
- * @param {Object} theme - The Office theme object.
+ * Removes triple-backtick html fences from generated content.
+ * @param {string} content
+ * @returns {string}
  */
-function updateThemeStyles(theme) {
-  if (theme) {
-    if (theme.bodyBackgroundColor) {
-      document.documentElement.style.setProperty("--bg-color", theme.bodyBackgroundColor);
+function removeHtmlFences(content) {
+  const fence = "```html" + String.fromCharCode(10);
+  if (typeof content === "string" &amp;&amp; content.startsWith(fence) &amp;&amp; content.endsWith("```")) {
+    return content.slice(fence.length, -3);
+  }
+  return content;
+}
+
+/**
+ * Keeps chat history capped to avoid memory bloat.
+ * @param {number} [max=HISTORY_CAP]
+ */
+function capHistory(max = HISTORY_CAP) {
+  const history = document.getElementById("chatHistory");
+  if (!history) return;
+  while (history.children.length > max) history.removeChild(history.firstChild);
+}
+
+/**
+ * Minimal HTML sanitizer: strips &lt;script> tags and inline event handlers.
+ * Replace with DOMPurify for production.
+ * @param {string} html
+ * @returns {string}
+ */
+function sanitizeHtml(html) {
+  return String(html || "")
+    .replace(/&lt;script[\s\S]*?>[\s\S]*?&lt;\/script>/gi, "")
+    .replace(/\son\w+=(["'])([\s\S]*?)\1/gi, "")
+    .replace(/javascript:/gi, "");
+}
+
+/**
+ * Appends a chat message bubble into chat history.
+ * @param {string} text
+ * @param {'user'|'ai'} sender
+ * @returns {HTMLElement|null} The appended element or null.
+ */
+function appendMessage(text, sender) {
+  const history = document.getElementById("chatHistory");
+  if (!history) return null;
+  const messageEl = document.createElement("div");
+  messageEl.classList.add("message", `${sender}-message`);
+  messageEl.dataset.sender = sender;
+  messageEl.textContent = text;
+  history.appendChild(messageEl);
+  capHistory();
+  history.scrollTop = history.scrollHeight;
+  return messageEl;
+}
+
+/* ============================
+   Office theme integration
+   ============================ */
+
+/**
+ * Safely applies Office theme colors into CSS variables.
+ * Falls back to sensible defaults when tokens or getComputedStyle are unavailable.
+ * @param {Object} theme
+ */
+function applyOfficeThemeVars(theme) {
+  if (!theme) return;
+  const FALLBACKS = {
+    bg: "#ffffff",
+    surface: "#fbfcfd",
+    text: "#111827",
+    border: "#e6e9ee",
+    muted: "#6b7280",
+    accent: "#0f64ff",
+    shadow: "0 1px 2px rgba(16,24,40,0.04)",
+  };
+  function readCssVar(name) {
+    try {
+      if (typeof window !== "undefined" &amp;&amp; typeof window.getComputedStyle === "function") {
+        const comp = window.getComputedStyle(document.documentElement);
+        const val = comp.getPropertyValue(name);
+        if (val) return val.trim();
+      }
+    } catch (readErr) {
+      log("readCssVar getComputedStyle failed: " + (readErr &amp;&amp; readErr.message));
     }
-    if (theme.bodyForegroundColor) {
-      document.documentElement.style.setProperty("--text-color", theme.bodyForegroundColor);
+    try {
+      const inline = document.documentElement.style.getPropertyValue(name);
+      if (inline) return inline.trim();
+    } catch (inlineErr) {
+      log("readCssVar inline style read failed: " + (inlineErr &amp;&amp; inlineErr.message));
     }
+    const key = name.replace(/^--/, "");
+    return FALLBACKS[key] || "";
+  }
+  const currentBg = readCssVar("--bg") || FALLBACKS.bg;
+  const currentText = readCssVar("--text") || FALLBACKS.text;
+  const bodyBg =
+    theme.bodyBackgroundColor &amp;&amp; String(theme.bodyBackgroundColor).trim()
+      ? theme.bodyBackgroundColor
+      : currentBg;
+  const bodyFg =
+    theme.bodyForegroundColor &amp;&amp; String(theme.bodyForegroundColor).trim()
+      ? theme.bodyForegroundColor
+      : currentText;
+  try {
+    document.documentElement.style.setProperty("--bg", bodyBg);
+    document.documentElement.style.setProperty("--surface", bodyBg);
+    document.documentElement.style.setProperty("--text", bodyFg);
+    if (theme.bodyBorderColor) document.documentElement.style.setProperty("--border", theme.bodyBorderColor);
+    if (theme.bodySubtleColor) document.documentElement.style.setProperty("--muted", theme.bodySubtleColor);
+  } catch (e) {
+    console.warn("applyOfficeThemeVars failed", e);
   }
 }
 
 /**
- * Registers the Office theme change event handler.
+ * Registers the Office theme change handler if available.
+ * Uses mailbox.addHandlerAsync to watch for OfficeThemeChanged events.
  */
 function registerThemeChangeHandler() {
-  const mailbox = Office.context?.mailbox;
-  if (mailbox &amp;&amp; mailbox.addHandlerAsync) {
+  try {
+    const mailbox = window.Office?.context?.mailbox;
+    if (!mailbox || !window.Office.EventType?.OfficeThemeChanged) return;
     mailbox.addHandlerAsync(
       Office.EventType.OfficeThemeChanged,
-      (eventArgs) => {
-        const theme = eventArgs.officeTheme;
-        updateThemeStyles(theme);
+      function (eventArgs) {
+        applyOfficeThemeVars(eventArgs?.officeTheme);
       },
-      (result) => {
-        if (result.status === Office.AsyncResultStatus.Failed) {
-          console.error("Failed to register theme change handler:", result.error.message);
+      function (result) {
+        if (result &amp;&amp; result.status === Office.AsyncResultStatus.Failed) {
+          console.error("Failed to register theme change handler:", result.error &amp;&amp; result.error.message);
         } else {
-          log("Theme change handler registered successfully.");
+          try {
+            const currentTheme = mailbox.officeTheme;
+            if (currentTheme) applyOfficeThemeVars(currentTheme);
+          } catch (e) {
+            log("registerThemeChangeHandler: reading mailbox.officeTheme failed: " + (e &amp;&amp; e.message));
+          }
+          console.debug("Theme change handler registered.");
         }
       }
     );
+  } catch (e) {
+    console.warn("Office theming not available", e);
   }
 }
+
+/* -------------------------
+   DOM helpers and UI updates
+   ------------------------- */
 
 /**
  * Sets the metadata for the email pane.
@@ -173,9 +316,13 @@ function setMetaData(sentiment, urgency, intention) {
   const urgencyIndicator = document.getElementById("urgencyIndicator");
 
   // Updates the UI with the retrieved metadata
-  document.getElementById("sentiment").textContent = sentiment ?? "—";
-  document.getElementById("urgency").textContent = urgency ?? "—";
-  document.getElementById("intention").textContent = intention ?? "—";
+  const sentimentEl = document.getElementById("sentiment");
+  const urgencyEl = document.getElementById("urgency");
+  const intentionEl = document.getElementById("intention");
+
+  if (sentimentEl) sentimentEl.textContent = sentiment ?? "—";
+  if (urgencyEl) urgencyEl.textContent = urgency ?? "—";
+  if (intentionEl) intentionEl.textContent = intention ?? "—";
 
   // Update urgency indicator color
   if (urgencyIndicator) {
@@ -195,194 +342,313 @@ function setMetaData(sentiment, urgency, intention) {
   return;
 }
 
-/* -------------------------
-   API call helpers (retry/backoff)
-   ------------------------- */
+/* ============================
+   Compose backup and setter
+   ============================ */
 
 /**
- * Calls the custom API to generate a response.
- * Includes a retry mechanism with exponential backoff for rate limit errors.
- * @param {string} userQuery - The user's query to send to the API.
- * @returns {Promise&lt;string>} A promise that resolves with the generated text.
+ * Saves a backup of the current compose HTML body for undo.
+ * @returns {Promise&lt;void>}
+ */
+composeBackupStore.saveBackup = async function () {
+  try {
+    const item = Office?.context?.mailbox?.item;
+    if (!item || typeof item.body?.getAsync !== "function") return;
+    const html = await new Promise((resolve) => {
+      item.body.getAsync(Office.CoercionType.Html, (res) => {
+        if (res.status === Office.AsyncResultStatus.Succeeded) resolve(res.value || "");
+        else resolve("");
+      });
+    });
+    this.lastBackup = html;
+    log("Saved compose backup.");
+  } catch (e) {
+    console.warn("Failed saving compose backup", e);
+  }
+};
+
+/**
+ * Restores the last saved backup into the compose body.
+ * @returns {Promise&lt;boolean>} true if restored
+ */
+composeBackupStore.restoreBackup = async function () {
+  if (!this.lastBackup) return false;
+  try {
+    await setDraftBody(this.lastBackup, { createBackup: false });
+    this.lastBackup = null;
+    return true;
+  } catch (e) {
+    console.warn("Restore backup failed", e);
+    return false;
+  }
+};
+
+/**
+ * Sets the draft HTML into the open compose editor.
+ * Tries item.body.setAsync, then falls back to displayNewMessageForm.
+ * @param {string} htmlContent - HTML to write into the compose body
+ * @param {SetDraftOptions} [options]
+ * @returns {Promise&lt;void>}
+ */
+async function setDraftBody(htmlContent, options = { createBackup: true }) {
+  const html = sanitizeHtml(String(htmlContent || "&lt;p>&lt;/p>"));
+  if (options.createBackup) await composeBackupStore.saveBackup();
+  try {
+    const item = Office?.context?.mailbox?.item;
+    if (item &amp;&amp; typeof item.body?.setAsync === "function") {
+      await new Promise((resolve, reject) => {
+        item.body.setAsync(html, { coercionType: Office.CoercionType.Html }, (asyncResult) => {
+          if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+            log("setDraftBody: updated compose body via setAsync.");
+            resolve(true);
+          } else {
+            reject(asyncResult.error);
+          }
+        });
+      });
+      return;
+    }
+    if (typeof Office.context.mailbox.displayNewMessageForm === "function") {
+      try {
+        Office.context.mailbox.displayNewMessageForm({ htmlBody: html });
+        log("setDraftBody: opened new compose with provided HTML as fallback.");
+        return;
+      } catch (e) {
+        log("setDraftBody displayNewMessageForm failed: " + (e &amp;&amp; e.message));
+      }
+    }
+    throw new Error("No supported compose APIs to set draft body in this host.");
+  } catch (err) {
+    showError("Could not update draft automatically. You can copy the suggested text manually.");
+    log("setDraftBody failed: " + (err?.message || err));
+    throw err;
+  }
+}
+
+/* ============================
+   Fetch helpers with timeout + retries
+   ============================ */
+
+/**
+ * Performs fetch with an AbortController timeout.
+ * Uses window.AbortController when available to avoid linter undefined errors.
+ * @param {string} url
+ * @param {RequestInit} [opts]
+ * @param {number} [timeoutMs=REQUEST_TIMEOUT_MS]
+ * @returns {Promise&lt;Response>}
+ */
+async function fetchWithTimeout(url, opts = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+  // Prefer the global AbortController when available
+  const AC = typeof window !== "undefined" &amp;&amp; window.AbortController ? new window.AbortController() : null;
+  if (AC) {
+    opts.signal = AC.signal;
+  }
+
+  const timerId = typeof window !== "undefined" &amp;&amp; window.setTimeout ? window.setTimeout(() => AC &amp;&amp; AC.abort(), timeoutMs) : null;
+
+  try {
+    const res = await fetch(url, opts);
+    if (typeof window !== "undefined" &amp;&amp; window.clearTimeout &amp;&amp; timerId) window.clearTimeout(timerId);
+    return res;
+  } catch (err) {
+    if (typeof window !== "undefined" &amp;&amp; window.clearTimeout &amp;&amp; timerId) window.clearTimeout(timerId);
+    throw err;
+  }
+}
+
+/**
+ * Determines whether a response status is retriable.
+ * @param {number} status
+ * @returns {boolean}
+ */
+function isRetriableStatus(status) {
+  return status === 429 || (status >= 500 &amp;&amp; status &lt; 600);
+}
+
+/* ============================
+   Model response normalization
+   ============================ */
+
+/**
+ * Normalizes various provider response shapes into { text?, functionCall? }.
+ * Supports Google-style candidates and OpenAI-style choices.
+ * @param {any} result
+ * @returns {NormalizedResult|null}
+ */
+function normalizeModelResult(result) {
+  const candidate = result?.candidates?.[0];
+  if (candidate) {
+    if (candidate.functionCall) {
+      let args = candidate.functionCall.arguments || candidate.functionCall.args || candidate.functionCall.argumentsJson;
+      if (typeof args === "string") {
+        try {
+          args = JSON.parse(args);
+        } catch (parseErr) {
+          log("normalizeModelResult: failed to parse functionCall args: " + (parseErr &amp;&amp; parseErr.message));
+        }
+      }
+      return { functionCall: { name: candidate.functionCall.name, args } };
+    }
+    const part = candidate.content?.parts?.[0];
+    if (part?.text) return { text: part.text };
+    if (part?.content) return { text: part.content };
+  }
+
+  const choice = result?.choices?.[0];
+  if (choice) {
+    const func = choice.message?.function_call || choice.function_call;
+    if (func) {
+      let args = func.arguments || func.argumentsJson || func.args;
+      if (typeof args === "string") {
+        try {
+          args = JSON.parse(args);
+        } catch (parseErr) {
+          log("normalizeModelResult: failed to parse function_call args: " + (parseErr &amp;&amp; parseErr.message));
+        }
+      }
+      return { functionCall: { name: func.name, args } };
+    }
+    const text = choice.message?.content?.text || choice.text || "";
+    if (text) return { text };
+  }
+
+  if (typeof result?.text === "string") return { text: result.text };
+  return null;
+}
+
+/* ============================
+   Proxy + Gemini client wrapper
+   ============================ */
+
+/**
+ * Calls the server-side proxy which should call the Generative Language API.
+ * Proxy URL is read from config proxy_gen_endpoint or DEFAULT_PROXY_ENDPOINT.
+ * Returns normalized { text?, functionCall? }.
+ *
+ * @param {string} userQuery
+ * @param {string} system_instruction
+ * @param {CallGeminiOptions} [options]
+ * @returns {Promise&lt;NormalizedResult>}
+ */
+async function callGeminiAPI(userQuery, system_instruction, options = {}) {
+  const proxyUrl = getVar("proxy_gen_endpoint") || DEFAULT_PROXY_ENDPOINT;
+  const body = { prompt: String(userQuery || ""), system: String(system_instruction || ""), ...(options.apiParams || {}) };
+
+  const maxAttempts = options.maxAttempts || 4;
+  const baseDelay = options.baseDelayMs || 1000;
+  let attempt = 0;
+
+  while (attempt &lt; maxAttempts) {
+    attempt++;
+    try {
+      const res = await fetchWithTimeout(
+        proxyUrl,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+        options.timeoutMs || REQUEST_TIMEOUT_MS
+      );
+
+      log(`Attempt ${attempt}: API response status is ${res.status}`);
+
+      if (isRetriableStatus(res.status)) {
+        const delay = baseDelay * Math.pow(2, attempt - 1) + Math.random() * 500;
+        log(`Retriable response. Waiting ${Math.round(delay)}ms before retry.`);
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`API call failed with status ${res.status}: ${txt}`);
+      }
+
+      const result = await res.json();
+      if (result &amp;&amp; (result.text || result.functionCall)) return result;
+      const normalized = normalizeModelResult(result);
+      if (!normalized) throw new Error("Unexpected response format from proxy API.");
+      log("API call successful.");
+      return normalized;
+    } catch (err) {
+      log(`Attempt ${attempt}: an error occurred. ${err &amp;&amp; err.message}`);
+      if (attempt >= maxAttempts) throw new Error(`Failed to call generative API after ${maxAttempts} attempts: ${err &amp;&amp; err.message}`);
+      const backoff = baseDelay * Math.pow(2, attempt - 1) + Math.random() * 500;
+      await new Promise((r) => setTimeout(r, backoff));
+    }
+  }
+  throw new Error("callGeminiAPI exhausted retries.");
+}
+
+/**
+ * Legacy wrapper for custom endpoints. Kept for compatibility.
+ * @param {any} userQuery
+ * @returns {Promise&lt;any>}
  */
 async function callCustomEndpoint(userQuery) {
   const apiUrl = getVar("customendpoint_url");
   if (!apiUrl) throw new Error("customendpoint_url not configured.");
-  const payload = {
-    query: userQuery,
-  };
-
-  let attempts = 0;
-  const maxAttempts = 5;
-  const baseDelay = 1000;
-
+  const payload = { query: userQuery };
+  let attempts = 0,
+    maxAttempts = 5,
+    baseDelay = 1000;
   while (attempts &lt; maxAttempts) {
     try {
-      log(`Attempting to call custom API. Attempt ${attempts + 1} of ${maxAttempts}.`);
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-      log(`Attempt ${attempts + 1}: API response status is ${response.status}`);
-
-      // Handles rate limiting with exponential backoff
-      if (response.status === 429) {
-        const delay = baseDelay * Math.pow(2, attempts) + Math.random() * 1000;
-        attempts++;
-        log(`Rate limit exceeded. Retrying in ${delay}ms.`);
-        await new Promise((res) => setTimeout(res, delay));
+      attempts++;
+      const res = await fetchWithTimeout(
+        apiUrl,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) },
+        REQUEST_TIMEOUT_MS
+      );
+      log(`Attempt ${attempts}: API response status is ${res.status}`);
+      if (isRetriableStatus(res.status)) {
+        const delay = baseDelay * Math.pow(2, attempts - 1) + Math.random() * 1000;
+        await new Promise((r) => setTimeout(r, delay));
         continue;
       }
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API call failed with status ${response.status}: ${errorText}`);
+      if (!res.ok) {
+        const errTxt = await res.text();
+        throw new Error(`API call failed with status ${res.status}: ${errTxt}`);
       }
-
-      const result = await response.json();
-      // Checks for a valid response format and returns the generated text
-      if (result) {
-        log("API call successful.");
-        return result;
-      } else {
-        throw new Error("Invalid response format from API.");
-      }
-    } catch (error) {
-      attempts++;
-      log(`Attempt ${attempts}: an error occurred. ${error.message}`);
-      if (attempts >= maxAttempts) {
-        throw new Error(`Failed to call custom API after ${maxAttempts} attempts.`);
-      }
+      const result = await res.json();
+      if (!result) throw new Error("Invalid response format from API.");
+      return result;
+    } catch (err) {
+      log(`Attempt ${attempts}: an error occurred. ${err &amp;&amp; err.message}`);
+      if (attempts >= maxAttempts) throw err;
     }
   }
 }
 
-/**
- * Calls the Gemini API to generate a response.
- * Includes a retry mechanism with exponential backoff for rate limit errors.
- * @param {string} userQuery - The user's query to send to the API.
- * @param {string} system_instruction - The system instruction for the API.
- * @returns {Promise&lt;string>} A promise that resolves with the generated text.
- */
-async function callGeminiAPI(userQuery, system_instruction) {
-  const apiKey = getVar("google_api_key"); // Replace with your actual API key or use a secure method to store it
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not set in environment variables.");
-  }
-  const apiUrl = `${getVar("endpoint_url")}${apiKey}`;
-  const payload = {
-    contents: [
-      {
-        parts: [
-          {
-            text: userQuery,
-          },
-        ],
-      },
-    ],
-    tools: [
-      {
-        google_search: {},
-      },
-    ],
-    systemInstruction: {
-      parts: [
-        {
-          text: system_instruction,
-        },
-      ],
-    },
-  };
-
-  let attempts = 0;
-  const maxAttempts = 5;
-  const baseDelay = 1000;
-
-  while (attempts &lt; maxAttempts) {
-    try {
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-      log(`Attempt ${attempts + 1}: API response status is ${response.status}`);
-
-      // Handles rate limiting with exponential backoff
-      if (response.status === 429) {
-        const delay = baseDelay * Math.pow(2, attempts) + Math.random() * 1000;
-        attempts++;
-        log(`Rate limit exceeded. Retrying in ${delay}ms.`);
-        await new Promise((res) => setTimeout(res, delay));
-        continue;
-      }
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API call failed with status ${response.status}: ${errorText}`);
-      }
-
-      const result = await response.json();
-      const candidate = result.candidates?.[0];
-
-      // Checks for a valid response format and returns the generated text
-      if (candidate &amp;&amp; candidate.content?.parts?.[0]?.text) {
-        log("API call successful.");
-        return candidate.content.parts[0].text;
-      } else {
-        throw new Error("Invalid response format from API.");
-      }
-    } catch (error) {
-      attempts++;
-      log(`Attempt ${attempts}: an error occurred. ${error.message}`);
-      if (attempts >= maxAttempts) {
-        throw new Error(`Failed to call Gemini API after ${maxAttempts} attempts.`);
-      }
-    }
-  }
-}
-
-/* -------------------------
-   Email helpers
-   ------------------------- */
+/* ============================
+   Email helpers and compose helpers
+   ============================ */
 
 /**
  * Retrieves the email body text for the provided item.
- * @param {Office.Item} item - The mailbox item.
- * @returns {Promise&lt;string>} The plain text body content.
+ * @param {Office.Item} item
+ * @returns {Promise&lt;string>}
  */
 async function getEmailBody(item) {
   return new Promise((resolve, reject) => {
     if (item.body?.getAsync) {
       item.body.getAsync(Office.CoercionType.Text, (asyncResult) => {
-        if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
-          resolve(asyncResult.value);
-        } else {
-          reject(asyncResult.error);
-        }
+        if (asyncResult.status === Office.AsyncResultStatus.Succeeded) resolve(asyncResult.value);
+        else reject(asyncResult.error);
       });
-    } else {
-      resolve(""); // Resolve with an empty string if no body exists.
-    }
+    } else resolve("");
   });
 }
 
-/* -------------------------
-   Compose helpers and button wiring
-   ------------------------- */
-
 /**
- * Returns a sensible suggested subject derived from the item subject.
- * @param {Office.Item} item - The mailbox item.
- * @returns {string} The suggested subject line.
+ * Suggests a subject line derived from the item subject.
+ * @param {Office.Item} item
+ * @returns {string}
  */
 function getSuggestedSubjectFromItem(item) {
   try {
-    const subj = item?.subject?.toString ? item.subject.toString() : (item?.subject || "");
+    const subj = item?.subject?.toString ? item.subject.toString() : item?.subject || "";
     return subj ? `Re: ${subj}` : "Reply";
   } catch {
     return "Reply";
@@ -390,53 +656,42 @@ function getSuggestedSubjectFromItem(item) {
 }
 
 /**
- * Opens a compose window using the most appropriate Office.js API available.
+ * Tries to open a compose window and inject htmlDraft.
  * Tries displayReplyAllForm, displayReplyForm, then displayNewMessageForm as fallback.
- * @param {Office.Item} item - The mailbox item to base the compose on.
- * @param {string} htmlDraft - The HTML content to insert into the compose window.
- * @param {string} fallbackSubject - Optional subject when opening a new message form.
+ * @param {Office.Item} item
+ * @param {string} htmlDraft
+ * @param {string} fallbackSubject
  */
 function openComposeWithHtml(item, htmlDraft, fallbackSubject) {
   const htmlBody = typeof htmlDraft === "string" ? htmlDraft : String(htmlDraft || "&lt;p>—&lt;/p>");
   try {
-    // Preferred: open Reply All compose and inject html
     if (typeof item.displayReplyAllForm === "function") {
       try {
-        item.displayReplyAllForm({ htmlBody: htmlBody });
+        item.displayReplyAllForm({ htmlBody });
         log("Opened Reply All compose with suggested draft.");
         return;
       } catch (err) {
         log("displayReplyAllForm threw: " + (err?.message || err));
-        // fall through to other options
       }
     }
-
-    // Older hosts may only support reply (not replyAll)
     if (typeof item.displayReplyForm === "function") {
       try {
-        item.displayReplyForm({ htmlBody: htmlBody });
+        item.displayReplyForm({ htmlBody });
         log("Opened Reply compose with suggested draft.");
         return;
       } catch (err) {
         log("displayReplyForm threw: " + (err?.message || err));
       }
     }
-
-    // Fallback: open a new message form (recipients won't be prefilled unless added)
     if (typeof Office.context.mailbox.displayNewMessageForm === "function") {
       try {
-        Office.context.mailbox.displayNewMessageForm({
-          htmlBody: htmlBody,
-          subject: fallbackSubject || getSuggestedSubjectFromItem(item),
-        });
+        Office.context.mailbox.displayNewMessageForm({ htmlBody, subject: fallbackSubject || getSuggestedSubjectFromItem(item) });
         log("Opened New Message compose with suggested draft.");
         return;
       } catch (err) {
         log("displayNewMessageForm threw: " + (err?.message || err));
       }
     }
-
-    // No supported compose API available
     showError("Unable to open a draft in this Outlook host. Try replying manually.");
     log("No supported compose APIs available in this host.");
   } catch (err) {
@@ -445,32 +700,220 @@ function openComposeWithHtml(item, htmlDraft, fallbackSubject) {
   }
 }
 
-/* -------------------------
-   DOM wiring for buttons (Quick Reply)
-   ------------------------- */
+/* ============================
+   Chat handling and wiring
+   ============================ */
+
+/** Guard to prevent double-send */
+let sending = false;
+
+/**
+ * Handles the user's chat query, calls the generative proxy, and updates the chat UI.
+ * Supports function-call responses that invoke setDraftBody for automatic draft edits.
+ * @returns {Promise&lt;void>}
+ */
+async function handleChatQuery() {
+  const input = document.getElementById("chatInput");
+  const sendBtn = document.getElementById("chatSendBtn");
+  if (!input || !sendBtn) return;
+  const query = input.value.trim();
+  if (!query || sending) return;
+
+  sending = true;
+  sendBtn.disabled = true;
+  input.disabled = true;
+  input.value = "";
+  appendMessage(query, "user");
+
+  appendMessage("Thinking...", "ai");
+  const history = document.getElementById("chatHistory");
+  const lastAiMessage = history?.lastChild;
+
+  try {
+    const chatSystemInstruction =
+      getVar("chatSystemPrompt") ||
+      "You are a helpful assistant. If asked to modify the draft, respond by calling the function setDraftBody with an object argument { htmlContent: '&lt;full HTML>' } and do NOT return the modified body as plain text.";
+
+    const rawResult = await callGeminiAPI(query, chatSystemInstruction, { timeoutMs: REQUEST_TIMEOUT_MS });
+
+    const normalized = rawResult &amp;&amp; (rawResult.text || rawResult.functionCall) ? rawResult : normalizeModelResult(rawResult);
+
+    if (!normalized) {
+      if (lastAiMessage) lastAiMessage.textContent = "Error: unexpected assistant response format.";
+      return;
+    }
+
+    if (normalized.functionCall &amp;&amp; normalized.functionCall.name === "setDraftBody") {
+      const args = normalized.functionCall.args || {};
+      const htmlContent = args.htmlContent || args.html || args.content || "";
+      if (!htmlContent) {
+        if (lastAiMessage) lastAiMessage.textContent = "Assistant attempted to modify the draft but returned no content.";
+      } else {
+        try {
+          await setDraftBody(htmlContent, { createBackup: true });
+          if (lastAiMessage) lastAiMessage.textContent = "Draft updated successfully in the compose window.";
+          showUndoToast();
+        } catch (err) {
+          if (lastAiMessage) lastAiMessage.textContent = "Assistant provided a draft; automatic update failed. See console.";
+          log("handleChatQuery setDraftBody failed: " + (err &amp;&amp; err.message));
+        }
+      }
+      return;
+    }
+
+    const replyText = normalized.text || "I couldn't generate a response.";
+    if (lastAiMessage) lastAiMessage.textContent = replyText;
+  } catch (err) {
+    if (history?.lastChild) history.lastChild.textContent = "Error: Could not connect to the assistant.";
+    console.error("Chat API error:", err);
+  } finally {
+    sending = false;
+    sendBtn.disabled = false;
+    input.disabled = false;
+    input.focus();
+    if (history) history.scrollTop = history.scrollHeight;
+  }
+}
+
+/* ============================
+   UI helpers: chat toggle &amp; undo toast
+   ============================ */
+
+/**
+ * Wires the chat panel toggle header so it is keyboard accessible and updates aria-expanded correctly.
+ */
+function wireChatToggle() {
+  const toggleBtn = document.getElementById("toggleChatBtn");
+  const chatContent = document.getElementById("chatContent");
+  const header = document.querySelector(".chat-header");
+  if (!toggleBtn || !chatContent || !header) return;
+  header.setAttribute("role", "button");
+  header.tabIndex = 0;
+  header.addEventListener("click", () => {
+    const nowHidden = chatContent.classList.toggle("hidden");
+    toggleBtn.setAttribute("aria-expanded", String(!nowHidden));
+    if (!nowHidden) {
+      const input = document.getElementById("chatInput");
+      if (input) input.focus();
+    }
+  });
+  header.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      header.click();
+    }
+  });
+}
+
+/**
+ * Shows a small undo toast after an automatic draft update. Auto-hides after 30s.
+ * Clicking Undo attempts to restore the previous draft.
+ */
+function showUndoToast() {
+  let toast = document.getElementById("undoToast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "undoToast";
+    toast.className = "card";
+    toast.style.position = "fixed";
+    toast.style.right = "16px";
+    toast.style.bottom = "16px";
+    toast.style.zIndex = 9999;
+    const text = document.createElement("div");
+    text.textContent = "Draft updated. ";
+    const undoBtn = document.createElement("button");
+    undoBtn.textContent = "Undo";
+    undoBtn.className = "primary";
+    undoBtn.addEventListener("click", async () => {
+      const ok = await composeBackupStore.restoreBackup();
+      if (ok) {
+        showError("Draft restored.");
+      } else {
+        showError("No backup available.");
+      }
+      cleanup();
+    });
+    const cleanup = () => {
+      if (toast &amp;&amp; toast.parentNode) toast.parentNode.removeChild(toast);
+    };
+    toast.appendChild(text);
+    toast.appendChild(undoBtn);
+    document.body.appendChild(toast);
+    setTimeout(cleanup, 30000);
+  }
+}
+
+/* ============================
+   DOM wiring (single init)
+   ============================ */
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Ensure Quick Reply button exists and will be enabled by onReady flow
+  registerThemeChangeHandler();
+
+  // Quick Reply guard - enabled by onReady when item is present
   const btnQuickReply = document.getElementById("btnQuickReply");
-  if (btnQuickReply) {
-    // The onReady flow will attach the real behavior; keep safe guard here
-    btnQuickReply.disabled = true;
+  if (btnQuickReply) btnQuickReply.disabled = true;
+
+  // Info button: open configured help URL or show inline info window
+  const infoBtn = document.querySelector(".infoBtn");
+  if (infoBtn) {
+    infoBtn.addEventListener("click", () => {
+      try {
+        const helpUrl = getVar("helpUrl");
+        if (helpUrl) {
+          window.open(helpUrl, "_blank", "noopener,noreferrer");
+          log(`Opened help link: ${helpUrl}`);
+        } else {
+          const infoWindow = window.open("", "Info", "width=400,height=250,menubar=no,toolbar=no,location=no");
+          if (infoWindow) {
+            infoWindow.document.write(
+              "&lt;!doctype html>&lt;html>&lt;head>&lt;meta charset='utf-8'>&lt;title>About CommsAssist&lt;/title>&lt;/head>" +
+                "&lt;body style='font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:1em;'>" +
+                "&lt;h2>CommsAssist&lt;/h2>" +
+                "&lt;p>Hello! I am your AI assistant for managing email communications.&lt;/p>" +
+                "&lt;p>I can analyze sentiment, intention, and urgency of incoming emails, and draft replies for you.&lt;/p>" +
+                "&lt;p>Please select an email to get started.&lt;/p>" +
+                "&lt;/body>&lt;/html>"
+            );
+            infoWindow.document.close();
+          }
+        }
+      } catch (err) {
+        console.error("Failed to open help link:", err);
+        showError("Failed to open help link.");
+      }
+    });
+  }
+
+  wireChatToggle();
+
+  const chatSendBtn = document.getElementById("chatSendBtn");
+  const chatInput = document.getElementById("chatInput");
+  if (chatSendBtn) chatSendBtn.addEventListener("click", handleChatQuery);
+  if (chatInput) {
+    chatInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" &amp;&amp; !e.shiftKey) {
+        e.preventDefault();
+        handleChatQuery();
+      }
+    });
   }
 });
 
-/* -------------------------
+/* ============================
    Main Office onReady flow
-   ------------------------- */
+   ============================ */
 
 /**
- * The main entry point for the Office Add-in.
- * This function runs when the Office document is ready.
+ * Main entry point for the Office Add-in. Loads config, applies theme, analyzes message in read mode,
+ * wires Quick Reply to generate drafts and supports function-call responses to auto-update compose.
+ *
+ * @param {Office.OnReadyInfo} info
  */
 Office.onReady(async (info) => {
   log("Office.js is ready.");
   const configUrl = "config/config.json";
 
-  // Load the config file from the specified URL
   try {
     await loadConfig(configUrl);
     log("Configuration loaded successfully.");
@@ -479,21 +922,12 @@ Office.onReady(async (info) => {
     log(`Failed to load configuration: ${error.message}`);
   }
 
-  if (info) {
-    log(`Add-in is running in ${info.host} on ${info.platform}.`);
-  }
+  if (info) log(`Add-in is running in ${info.host} on ${info.platform}.`);
 
-  // Set initial theme
   const theme = Office.context.officeTheme;
-  if (theme) {
-    updateThemeStyles(theme);
-  }
-
-  // Register theme change handler after onReady
-  registerThemeChangeHandler();
+  if (theme) applyOfficeThemeVars(theme);
 
   const item = Office.context?.mailbox?.item;
-
   const helpdeskPrompt = getVar("helpdeskPrompt");
   const sentimentPrompt = getVar("sentimentPrompt");
   const urgencyPrompt = getVar("urgencyPrompt");
@@ -502,68 +936,49 @@ Office.onReady(async (info) => {
 
   if (!item) {
     log("No mail item found. Add-in may be running in an unsupported context.");
-    // Hides the main content and disables buttons
-    document.getElementById("sentimentContent").classList.add("hidden");
+    const sc = document.getElementById("sentimentContent");
+    if (sc) sc.classList.add("hidden");
     const quickBtn = document.getElementById("btnQuickReply");
     if (quickBtn) quickBtn.disabled = true;
-    // Displays a message to the user
     const rc = document.getElementById("responseContainer");
     if (rc) rc.textContent = "This add-in only works with email messages.";
-    return; // Stop execution if no item is available
+    return;
   }
 
   log(`Item type: ${item.itemType}`);
 
-  // Checks the mode (Read or Compose) of the mail item
   const isReadMode = item.itemType === Office.MailboxEnums.ItemType.Message;
   const isComposeMode = item.itemType === Office.MailboxEnums.ItemType.MessageCompose;
 
   if (isReadMode) {
     log("In READ mode.");
-    // Shows the read mode UI and enables the Quick Reply button
-    document.getElementById("sentimentContent").classList.remove("hidden");
+    const sc = document.getElementById("sentimentContent");
+    if (sc) sc.classList.remove("hidden");
     const quickBtn = document.getElementById("btnQuickReply");
     if (quickBtn) quickBtn.disabled = false;
 
-    // Wait for the email body to be retrieved first
     const emailBody = (await getEmailBody(item)).trim();
-
-    // Now that the 'preview' element is populated, proceed.
     const rc = document.getElementById("responseContainer");
     if (rc) rc.innerHTML = "Analyzing email content, please wait...";
 
     let name = "";
-    if (item.from) {
-      name = item.from.displayName || item.from.emailAddress || "";
-    }
+    if (item.from) name = item.from.displayName || item.from.emailAddress || "";
 
     try {
       if (customEndpointUrl !== "") {
-        // Retrieves additional email metadata asynchronously
-        const query = {
-          fromEmailAddress: name,
-          subject: item.subject ? item.subject : "Unknown",
-          body: emailBody,
-        };
+        const query = { fromEmailAddress: name, subject: item.subject ? item.subject : "Unknown", body: emailBody };
         const responseData = await callCustomEndpoint(query);
         log(`Call response: ${JSON.stringify(responseData)}`);
-
-        // Safely read expected values with guards
         let sentiment = responseData?.response?.metadata?.email_sentiment ?? "Unknown";
         let urgency = responseData?.response?.metadata?.email_urgency ?? "Unknown";
         let intention = responseData?.response?.metadata?.email_intention ?? "Unknown";
         draft = removeHtmlFences(responseData?.response?.answer?.email_draft ?? "");
-
-        document.getElementById("responseContainer").innerHTML =
-          "Analysis complete. Please click 'Quick Reply' to generate a draft.";
+        if (rc) rc.innerHTML = "Analysis complete. Please click 'Quick Reply' to generate a draft.";
         setMetaData(sentiment, urgency, intention);
       } else {
-        // No custom endpoint: call Gemini for metadata
-        let sentiment = "Unknown";
-        let urgency = "Unknown";
-        let intention = "Unknown";
-
-        // Calls the Gemini API to analyze sentiment
+        let sentiment = "Unknown",
+          urgency = "Unknown",
+          intention = "Unknown";
         try {
           const prompt = `From: ${name}\nBody: ${emailBody}`;
           sentiment = await callGeminiAPI(prompt, sentimentPrompt);
@@ -571,28 +986,22 @@ Office.onReady(async (info) => {
         } catch (err) {
           log(`Error analyzing sentiment: ${err.message}`);
         }
-        // Calls the Gemini API to analyze urgency
         try {
           const prompt = `From: ${name}\nBody: ${emailBody}`;
           urgency = await callGeminiAPI(prompt, urgencyPrompt);
           log(`Urgency analysis result: ${urgency}`);
         } catch (err) {
-          console.error(`Error analyzing urgency: ${err.message}`);
           log(`Error analyzing urgency: ${err.message}`);
         }
-        // Calls the Gemini API to analyze intention
         try {
           const prompt = `From: ${name}\nBody: ${emailBody}`;
           intention = await callGeminiAPI(prompt, intentionPrompt);
           log(`Intention analysis result: ${intention}`);
         } catch (err) {
-          console.error(`Error analyzing intention: ${err.message}`);
           log(`Error analyzing intention: ${err.message}`);
         }
 
-        document.getElementById("responseContainer").innerHTML =
-          "Analysis complete. Please click 'Quick Reply' to generate a draft.";
-
+        if (rc) rc.innerHTML = "Analysis complete. Please click 'Quick Reply' to generate a draft.";
         setMetaData(sentiment, urgency, intention);
       }
     } catch (err) {
@@ -601,56 +1010,69 @@ Office.onReady(async (info) => {
       showError("Analysis failed. See console for details.");
     }
 
-    // Event listener for the 'Quick Reply' button (generates and immediately opens a reply)
+    // Quick Reply behavior uses callGeminiAPI and supports function-call returns that update compose
     const quickReplyBtn = document.getElementById("btnQuickReply");
     if (quickReplyBtn) {
       quickReplyBtn.addEventListener("click", async () => {
-        // Disables the button and shows a loading message
         quickReplyBtn.disabled = true;
         const rc2 = document.getElementById("responseContainer");
-        if (rc2) rc2.innerHTML = "Generating draft...";
+        if (rc2) rc2.textContent = "Generating draft...";
 
         try {
           if (customEndpointUrl === "") {
             const prompt = `From: ${name}\nBody: ${emailBody}`;
-            // Calls the Gemini API to generate the draft
-            const generatedText = await callGeminiAPI(prompt, helpdeskPrompt);
-            draft = generatedText;
+            const result = await callGeminiAPI(prompt, helpdeskPrompt, { timeoutMs: REQUEST_TIMEOUT_MS });
+            const normalized = result &amp;&amp; (result.text || result.functionCall) ? result : normalizeModelResult(result);
+
+            if (normalized?.functionCall &amp;&amp; normalized.functionCall.name === "setDraftBody") {
+              const html = normalized.functionCall.args?.htmlContent || normalized.functionCall.args?.html || "";
+              if (html) {
+                await setDraftBody(html, { createBackup: true });
+                draft = html;
+                if (rc2) rc2.textContent = "Draft generated and inserted into compose window.";
+                showUndoToast();
+              } else throw new Error("functionCall returned no html content");
+            } else if (normalized?.text) {
+              draft = removeHtmlFences(normalized.text);
+              const cleaned = sanitizeHtml(draft);
+              openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item));
+              if (rc2) rc2.textContent = "Draft generated successfully. Opening compose window...";
+            } else throw new Error("Invalid response from generator");
+          } else {
+            // Legacy custom endpoint flow might already return HTML draft
+            const response = await callCustomEndpoint({ fromEmailAddress: name, subject: item.subject || "Unknown", body: emailBody });
+            draft = removeHtmlFences(response?.response?.answer?.email_draft || "");
+            const cleaned = sanitizeHtml(draft);
+            openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item));
+            if (rc2) rc2.textContent = "Draft generated successfully. Opening compose window...";
           }
         } catch (err) {
           draft = "&lt;html>&lt;body>&lt;p>Error generating draft. Please try again.&lt;/p>&lt;/body>&lt;/html>";
-          log(`Error generating draft: ${err.message}`);
-          console.error(`Error generating draft: ${err.message}`);
+          log(`Error generating draft: ${err &amp;&amp; err.message}`);
+          console.error(`Error generating draft: ${err}`);
+          if (document.getElementById("responseContainer"))
+            document.getElementById("responseContainer").textContent = "Error generating draft. Please try again.";
         } finally {
-          // Re-enables the button and informs user
           quickReplyBtn.disabled = false;
-          if (rc2) rc2.innerHTML = "Draft generated successfully. Opening compose window...";
         }
-
-        // Ensure draft is a string and sanitized for insertion
-        const htmlDraft = typeof draft === "string" ? draft : String(draft || "&lt;p>&lt;/p>");
-        const cleanedDraft = removeHtmlFences(htmlDraft);
-
-        // Try to open compose with HTML in a robust order
-        openComposeWithHtml(item, cleanedDraft, getSuggestedSubjectFromItem(item));
       });
     }
   } else if (isComposeMode) {
     log("In COMPOSE mode.");
-    // Hides the main content and disables buttons for compose mode
-    document.getElementById("sentimentContent").classList.add("hidden");
+    const sc = document.getElementById("sentimentContent");
+    if (sc) sc.classList.add("hidden");
     const quickBtn = document.getElementById("btnQuickReply");
     if (quickBtn) quickBtn.disabled = true;
     const rc = document.getElementById("responseContainer");
     if (rc) rc.innerHTML = "This functionality is not available in compose mode.";
   } else {
     log("In an unsupported mode.");
-    // Hides the main content and disables buttons for unsupported modes
-    document.getElementById("sentimentContent").classList.add("hidden");
+    const sc = document.getElementById("sentimentContent");
+    if (sc) sc.classList.add("hidden");
     const quickBtn = document.getElementById("btnQuickReply");
     if (quickBtn) quickBtn.disabled = true;
     const rc = document.getElementById("responseContainer");
-    if (rc) rc.innerHTML = "This add-in only works with email messages.";
+    if (rc) rc.textContent = "This add-in only works with email messages.";
   }
 });
 </code></pre>
@@ -663,13 +1085,13 @@ Office.onReady(async (info) => {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#callCustomEndpoint">callCustomEndpoint</a></li><li><a href="global.html#callGeminiAPI">callGeminiAPI</a></li><li><a href="global.html#getEmailBody">getEmailBody</a></li><li><a href="global.html#getSuggestedSubjectFromItem">getSuggestedSubjectFromItem</a></li><li><a href="global.html#getVar">getVar</a></li><li><a href="global.html#loadConfig">loadConfig</a></li><li><a href="global.html#log">log</a></li><li><a href="global.html#openComposeWithHtml">openComposeWithHtml</a></li><li><a href="global.html#registerThemeChangeHandler">registerThemeChangeHandler</a></li><li><a href="global.html#removeHtmlFences">removeHtmlFences</a></li><li><a href="global.html#setMetaData">setMetaData</a></li><li><a href="global.html#showError">showError</a></li><li><a href="global.html#updateThemeStyles">updateThemeStyles</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#appendMessage">appendMessage</a></li><li><a href="global.html#applyOfficeThemeVars">applyOfficeThemeVars</a></li><li><a href="global.html#callCustomEndpoint">callCustomEndpoint</a></li><li><a href="global.html#callGeminiAPI">callGeminiAPI</a></li><li><a href="global.html#capHistory">capHistory</a></li><li><a href="global.html#composeBackupStore">composeBackupStore</a></li><li><a href="global.html#configMap">configMap</a></li><li><a href="global.html#draft">draft</a></li><li><a href="global.html#fetchWithTimeout">fetchWithTimeout</a></li><li><a href="global.html#getEmailBody">getEmailBody</a></li><li><a href="global.html#getSuggestedSubjectFromItem">getSuggestedSubjectFromItem</a></li><li><a href="global.html#getVar">getVar</a></li><li><a href="global.html#handleChatQuery">handleChatQuery</a></li><li><a href="global.html#isRetriableStatus">isRetriableStatus</a></li><li><a href="global.html#loadConfig">loadConfig</a></li><li><a href="global.html#log">log</a></li><li><a href="global.html#normalizeModelResult">normalizeModelResult</a></li><li><a href="global.html#openComposeWithHtml">openComposeWithHtml</a></li><li><a href="global.html#registerThemeChangeHandler">registerThemeChangeHandler</a></li><li><a href="global.html#removeHtmlFences">removeHtmlFences</a></li><li><a href="global.html#sanitizeHtml">sanitizeHtml</a></li><li><a href="global.html#sending">sending</a></li><li><a href="global.html#setDraftBody">setDraftBody</a></li><li><a href="global.html#setMetaData">setMetaData</a></li><li><a href="global.html#showError">showError</a></li><li><a href="global.html#showUndoToast">showUndoToast</a></li><li><a href="global.html#wireChatToggle">wireChatToggle</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Tue Sep 30 2025 19:22:14 GMT+0100 (British Summer Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Oct 01 2025 15:37:41 GMT+0100 (British Summer Time)
 </footer>
 
 <script> prettyPrint(); </script>

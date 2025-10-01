@@ -94,6 +94,280 @@
     
 
     
+        <h3 class="subsection-title">Members</h3>
+
+        
+            
+<h4 class="name" id="composeBackupStore"><span class="type-signature">(constant) </span>composeBackupStore<span class="type-signature"> :<a href="global.html#ComposeBackupStore">ComposeBackupStore</a></span></h4>
+
+
+
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type"><a href="global.html#ComposeBackupStore">ComposeBackupStore</a></span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line53">line 53</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="configMap"><span class="type-signature"></span>configMap<span class="type-signature"> :Map.&lt;string, any></span></h4>
+
+
+
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Map.&lt;string, any></span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line47">line 47</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="draft"><span class="type-signature"></span>draft<span class="type-signature"> :string</span></h4>
+
+
+
+
+<div class="description">
+    Last generated HTML draft (module-scoped)
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">string</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line50">line 50</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="sending"><span class="type-signature"></span>sending<span class="type-signature"></span></h4>
+
+
+
+
+<div class="description">
+    Guard to prevent double-send
+</div>
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line680">line 680</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+    
 
     
         <h3 class="subsection-title">Methods</h3>
@@ -104,7 +378,7 @@
     
 
     
-    <h4 class="name" id="callCustomEndpoint"><span class="type-signature">(async) </span>callCustomEndpoint<span class="signature">(userQuery)</span><span class="type-signature"> &rarr; {Promise.&lt;string>}</span></h4>
+    <h4 class="name" id="appendMessage"><span class="type-signature"></span>appendMessage<span class="signature">(text, sender)</span><span class="type-signature"> &rarr; {HTMLElement|null}</span></h4>
     
 
     
@@ -112,8 +386,7 @@
 
 
 <div class="description">
-    Calls the custom API to generate a response.
-Includes a retry mechanism with exponential backoff for rate limit errors.
+    Appends a chat message bubble into chat history.
 </div>
 
 
@@ -149,7 +422,7 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
 
         <tr>
             
-                <td class="name"><code>userQuery</code></td>
+                <td class="name"><code>text</code></td>
             
 
             <td class="type">
@@ -165,7 +438,33 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
 
             
 
-            <td class="description last">The user's query to send to the API.</td>
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>sender</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">'user'</span>
+|
+
+<span class="param-type">'ai'</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
         </tr>
 
     
@@ -206,7 +505,7 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line180">line 180</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line167">line 167</a>
     </li></ul></dd>
     
 
@@ -235,7 +534,7 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
 
         
 <div class="param-desc">
-    A promise that resolves with the generated text.
+    The appended element or null.
 </div>
 
 
@@ -246,7 +545,10 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
     </dt>
     <dd>
         
-<span class="param-type">Promise.&lt;string></span>
+<span class="param-type">HTMLElement</span>
+|
+
+<span class="param-type">null</span>
 
 
     </dd>
@@ -264,7 +566,7 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
     
 
     
-    <h4 class="name" id="callGeminiAPI"><span class="type-signature">(async) </span>callGeminiAPI<span class="signature">(userQuery, system_instruction)</span><span class="type-signature"> &rarr; {Promise.&lt;string>}</span></h4>
+    <h4 class="name" id="applyOfficeThemeVars"><span class="type-signature"></span>applyOfficeThemeVars<span class="signature">(theme)</span><span class="type-signature"></span></h4>
     
 
     
@@ -272,8 +574,145 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
 
 
 <div class="description">
-    Calls the Gemini API to generate a response.
-Includes a retry mechanism with exponential backoff for rate limit errors.
+    Safely applies Office theme colors into CSS variables.
+Falls back to sensible defaults when tokens or getComputedStyle are unavailable.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>theme</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line189">line 189</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="callCustomEndpoint"><span class="type-signature">(async) </span>callCustomEndpoint<span class="signature">(userQuery)</span><span class="type-signature"> &rarr; {Promise.&lt;any>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Legacy wrapper for custom endpoints. Kept for compatibility.
 </div>
 
 
@@ -315,7 +754,7 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
             <td class="type">
             
                 
-<span class="param-type">string</span>
+<span class="param-type">any</span>
 
 
             
@@ -325,7 +764,174 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
 
             
 
-            <td class="description last">The user's query to send to the API.</td>
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line561">line 561</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;any></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="callGeminiAPI"><span class="type-signature">(async) </span>callGeminiAPI<span class="signature">(userQuery, system_instruction, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise.&lt;<a href="global.html#NormalizedResult">NormalizedResult</a>>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Calls the server-side proxy which should call the Generative Language API.
+Proxy URL is read from config proxy_gen_endpoint or DEFAULT_PROXY_ENDPOINT.
+Returns normalized { text?, functionCall? }.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>userQuery</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last"></td>
         </tr>
 
     
@@ -345,10 +951,51 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
             </td>
 
             
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
 
             
 
-            <td class="description last">The system instruction for the API.</td>
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#CallGeminiOptions">CallGeminiOptions</a></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last"></td>
         </tr>
 
     
@@ -389,7 +1036,7 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line242">line 242</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line505">line 505</a>
     </li></ul></dd>
     
 
@@ -417,10 +1064,6 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
 <h5>Returns:</h5>
 
         
-<div class="param-desc">
-    A promise that resolves with the generated text.
-</div>
-
 
 
 <dl>
@@ -429,7 +1072,412 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
     </dt>
     <dd>
         
-<span class="param-type">Promise.&lt;string></span>
+<span class="param-type">Promise.&lt;<a href="global.html#NormalizedResult">NormalizedResult</a>></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="capHistory"><span class="type-signature"></span>capHistory<span class="signature">(max<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Keeps chat history capped to avoid memory bloat.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>max</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    HISTORY_CAP
+                
+                </td>
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line142">line 142</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="fetchWithTimeout"><span class="type-signature">(async) </span>fetchWithTimeout<span class="signature">(url, opts<span class="signature-attributes">opt</span>, timeoutMs<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise.&lt;Response>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Performs fetch with an AbortController timeout.
+Uses window.AbortController when available to avoid linter undefined errors.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>url</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>opts</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">RequestInit</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>timeoutMs</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    REQUEST_TIMEOUT_MS
+                
+                </td>
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line412">line 412</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;Response></span>
 
 
     </dd>
@@ -507,7 +1555,7 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
 
             
 
-            <td class="description last">The mailbox item.</td>
+            <td class="description last"></td>
         </tr>
 
     
@@ -548,7 +1596,7 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line330">line 330</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line605">line 605</a>
     </li></ul></dd>
     
 
@@ -576,10 +1624,6 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
 <h5>Returns:</h5>
 
         
-<div class="param-desc">
-    The plain text body content.
-</div>
-
 
 
 <dl>
@@ -614,7 +1658,7 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
 
 
 <div class="description">
-    Returns a sensible suggested subject derived from the item subject.
+    Suggests a subject line derived from the item subject.
 </div>
 
 
@@ -666,7 +1710,7 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
 
             
 
-            <td class="description last">The mailbox item.</td>
+            <td class="description last"></td>
         </tr>
 
     
@@ -707,7 +1751,7 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line355">line 355</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line621">line 621</a>
     </li></ul></dd>
     
 
@@ -735,10 +1779,6 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
 <h5>Returns:</h5>
 
         
-<div class="param-desc">
-    The suggested subject line.
-</div>
-
 
 
 <dl>
@@ -765,7 +1805,7 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
     
 
     
-    <h4 class="name" id="getVar"><span class="type-signature"></span>getVar<span class="signature">(key)</span><span class="type-signature"> &rarr; {*}</span></h4>
+    <h4 class="name" id="getVar"><span class="type-signature"></span>getVar<span class="signature">(key)</span><span class="type-signature"> &rarr; {any}</span></h4>
     
 
     
@@ -773,7 +1813,8 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
 
 
 <div class="description">
-    Retrieves a value from the configuration map using its key.
+    Retrieves a value from the loaded config map.
+If the value is an array it joins with newline.
 </div>
 
 
@@ -825,7 +1866,7 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
 
             
 
-            <td class="description last">The key to look up in the config.</td>
+            <td class="description last"></td>
         </tr>
 
     
@@ -866,7 +1907,7 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line46">line 46</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line77">line 77</a>
     </li></ul></dd>
     
 
@@ -894,10 +1935,6 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
 <h5>Returns:</h5>
 
         
-<div class="param-desc">
-    The value associated with the key, or undefined if the key is not found.
-</div>
-
 
 
 <dl>
@@ -906,7 +1943,269 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
     </dt>
     <dd>
         
-<span class="param-type">*</span>
+<span class="param-type">any</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="handleChatQuery"><span class="type-signature">(async) </span>handleChatQuery<span class="signature">()</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Handles the user's chat query, calls the generative proxy, and updates the chat UI.
+Supports function-call responses that invoke setDraftBody for automatic draft edits.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line687">line 687</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="isRetriableStatus"><span class="type-signature"></span>isRetriableStatus<span class="signature">(status)</span><span class="type-signature"> &rarr; {boolean}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Determines whether a response status is retriable.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>status</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line436">line 436</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">boolean</span>
 
 
     </dd>
@@ -932,9 +2231,7 @@ Includes a retry mechanism with exponential backoff for rate limit errors.
 
 
 <div class="description">
-    Fetches the config.json file from the specified URL,
-parses the JSON, and loads the key-value pairs into a map.
-This is an asynchronous operation.
+    Loads a JSON config file and stores its key/values in configMap.
 </div>
 
 
@@ -986,7 +2283,7 @@ This is an asynchronous operation.
 
             
 
-            <td class="description last">The URL of the config.json file.</td>
+            <td class="description last">URL to config.json</td>
         </tr>
 
     
@@ -1027,7 +2324,7 @@ This is an asynchronous operation.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line23">line 23</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line91">line 91</a>
     </li></ul></dd>
     
 
@@ -1055,10 +2352,6 @@ This is an asynchronous operation.
 <h5>Returns:</h5>
 
         
-<div class="param-desc">
-    A promise that resolves when the config is loaded.
-</div>
-
 
 
 <dl>
@@ -1093,7 +2386,7 @@ This is an asynchronous operation.
 
 
 <div class="description">
-    Logs a message to the console with a [DEBUG] prefix.
+    Logs a debug message to the console.
 </div>
 
 
@@ -1145,7 +2438,7 @@ This is an asynchronous operation.
 
             
 
-            <td class="description last">The message to log.</td>
+            <td class="description last"></td>
         </tr>
 
     
@@ -1186,7 +2479,7 @@ This is an asynchronous operation.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line5">line 5</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line67">line 67</a>
     </li></ul></dd>
     
 
@@ -1222,6 +2515,165 @@ This is an asynchronous operation.
     
 
     
+    <h4 class="name" id="normalizeModelResult"><span class="type-signature"></span>normalizeModelResult<span class="signature">(result)</span><span class="type-signature"> &rarr; {<a href="global.html#NormalizedResult">NormalizedResult</a>|null}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Normalizes various provider response shapes into { text?, functionCall? }.
+Supports Google-style candidates and OpenAI-style choices.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>result</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">any</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line450">line 450</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="global.html#NormalizedResult">NormalizedResult</a></span>
+|
+
+<span class="param-type">null</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
     <h4 class="name" id="openComposeWithHtml"><span class="type-signature"></span>openComposeWithHtml<span class="signature">(item, htmlDraft, fallbackSubject)</span><span class="type-signature"></span></h4>
     
 
@@ -1230,7 +2682,7 @@ This is an asynchronous operation.
 
 
 <div class="description">
-    Opens a compose window using the most appropriate Office.js API available.
+    Tries to open a compose window and inject htmlDraft.
 Tries displayReplyAllForm, displayReplyForm, then displayNewMessageForm as fallback.
 </div>
 
@@ -1283,7 +2735,7 @@ Tries displayReplyAllForm, displayReplyForm, then displayNewMessageForm as fallb
 
             
 
-            <td class="description last">The mailbox item to base the compose on.</td>
+            <td class="description last"></td>
         </tr>
 
     
@@ -1306,7 +2758,7 @@ Tries displayReplyAllForm, displayReplyForm, then displayNewMessageForm as fallb
 
             
 
-            <td class="description last">The HTML content to insert into the compose window.</td>
+            <td class="description last"></td>
         </tr>
 
     
@@ -1329,7 +2781,7 @@ Tries displayReplyAllForm, displayReplyForm, then displayNewMessageForm as fallb
 
             
 
-            <td class="description last">Optional subject when opening a new message form.</td>
+            <td class="description last"></td>
         </tr>
 
     
@@ -1370,7 +2822,7 @@ Tries displayReplyAllForm, displayReplyForm, then displayNewMessageForm as fallb
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line371">line 371</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line637">line 637</a>
     </li></ul></dd>
     
 
@@ -1414,7 +2866,8 @@ Tries displayReplyAllForm, displayReplyForm, then displayNewMessageForm as fallb
 
 
 <div class="description">
-    Registers the Office theme change event handler.
+    Registers the Office theme change handler if available.
+Uses mailbox.addHandlerAsync to watch for OfficeThemeChanged events.
 </div>
 
 
@@ -1458,7 +2911,7 @@ Tries displayReplyAllForm, displayReplyForm, then displayNewMessageForm as fallb
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line113">line 113</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line244">line 244</a>
     </li></ul></dd>
     
 
@@ -1502,8 +2955,7 @@ Tries displayReplyAllForm, displayReplyForm, then displayNewMessageForm as fallb
 
 
 <div class="description">
-    Removes the leading and trailing triple-backtick 'html' fences from a string.
-This is useful for cleaning up code blocks formatted with Markdown.
+    Removes triple-backtick html fences from generated content.
 </div>
 
 
@@ -1555,7 +3007,7 @@ This is useful for cleaning up code blocks formatted with Markdown.
 
             
 
-            <td class="description last">The string that may contain the HTML fences.</td>
+            <td class="description last"></td>
         </tr>
 
     
@@ -1596,7 +3048,7 @@ This is useful for cleaning up code blocks formatted with Markdown.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line65">line 65</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line130">line 130</a>
     </li></ul></dd>
     
 
@@ -1624,10 +3076,6 @@ This is useful for cleaning up code blocks formatted with Markdown.
 <h5>Returns:</h5>
 
         
-<div class="param-desc">
-    The string with the fences removed.
-</div>
-
 
 
 <dl>
@@ -1637,6 +3085,361 @@ This is useful for cleaning up code blocks formatted with Markdown.
     <dd>
         
 <span class="param-type">string</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="sanitizeHtml"><span class="type-signature"></span>sanitizeHtml<span class="signature">(html)</span><span class="type-signature"> &rarr; {string}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Minimal HTML sanitizer: strips <script> tags and inline event handlers.
+Replace with DOMPurify for production.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>html</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line154">line 154</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">string</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="setDraftBody"><span class="type-signature">(async) </span>setDraftBody<span class="signature">(htmlContent, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Sets the draft HTML into the open compose editor.
+Tries item.body.setAsync, then falls back to displayNewMessageForm.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>htmlContent</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">HTML to write into the compose body</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#SetDraftOptions">SetDraftOptions</a></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line365">line 365</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
 
 
     </dd>
@@ -1801,7 +3604,7 @@ This is useful for cleaning up code blocks formatted with Markdown.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line140">line 140</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line283">line 283</a>
     </li></ul></dd>
     
 
@@ -1855,7 +3658,7 @@ This is useful for cleaning up code blocks formatted with Markdown.
     
 
     
-    <h4 class="name" id="showError"><span class="type-signature"></span>showError<span class="signature">(msg)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="showError"><span class="type-signature"></span>showError<span class="signature">(msg)</span><span class="type-signature"> &rarr; {void}</span></h4>
     
 
     
@@ -1863,7 +3666,7 @@ This is useful for cleaning up code blocks formatted with Markdown.
 
 
 <div class="description">
-    Shows an error message in the response container (or alert fallback)
+    Shows an error message in the response container (or alert if missing).
 </div>
 
 
@@ -1915,7 +3718,7 @@ This is useful for cleaning up code blocks formatted with Markdown.
 
             
 
-            <td class="description last">message to show</td>
+            <td class="description last"></td>
         </tr>
 
     
@@ -1956,7 +3759,114 @@ This is useful for cleaning up code blocks formatted with Markdown.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line83">line 83</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line108">line 108</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">void</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="showUndoToast"><span class="type-signature"></span>showUndoToast<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Shows a small undo toast after an automatic draft update. Auto-hides after 30s.
+Clicking Undo attempts to restore the previous draft.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line784">line 784</a>
     </li></ul></dd>
     
 
@@ -1992,7 +3902,7 @@ This is useful for cleaning up code blocks formatted with Markdown.
     
 
     
-    <h4 class="name" id="updateThemeStyles"><span class="type-signature"></span>updateThemeStyles<span class="signature">(theme)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="wireChatToggle"><span class="type-signature"></span>wireChatToggle<span class="signature">()</span><span class="type-signature"></span></h4>
     
 
     
@@ -2000,7 +3910,7 @@ This is useful for cleaning up code blocks formatted with Markdown.
 
 
 <div class="description">
-    Updates the document body styles based on the Office theme.
+    Wires the chat panel toggle header so it is keyboard accessible and updates aria-expanded correctly.
 </div>
 
 
@@ -2011,10 +3921,107 @@ This is useful for cleaning up code blocks formatted with Markdown.
 
 
 
-    <h5>Parameters:</h5>
+
+
+
+
+<dl class="details">
+
     
 
-<table class="params">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line757">line 757</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+    
+
+    
+        <h3 class="subsection-title">Type Definitions</h3>
+
+        
+                
+<h4 class="name" id="CallGeminiOptions">CallGeminiOptions</h4>
+
+
+
+
+<div class="description">
+    Options for callGeminiAPI
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
     <thead>
     <tr>
         
@@ -2023,6 +4030,8 @@ This is useful for cleaning up code blocks formatted with Markdown.
 
         <th>Type</th>
 
+        
+        <th>Attributes</th>
         
 
         
@@ -2036,7 +4045,100 @@ This is useful for cleaning up code blocks formatted with Markdown.
 
         <tr>
             
-                <td class="name"><code>theme</code></td>
+                <td class="name"><code>timeoutMs</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>maxAttempts</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>baseDelayMs</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>apiParams</code></td>
             
 
             <td class="type">
@@ -2049,17 +4151,23 @@ This is useful for cleaning up code blocks formatted with Markdown.
             </td>
 
             
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
 
             
 
-            <td class="description last">The Office theme object.</td>
+            <td class="description last"></td>
         </tr>
 
     
     </tbody>
 </table>
-
-
 
 
 
@@ -2093,7 +4201,7 @@ This is useful for cleaning up code blocks formatted with Markdown.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line99">line 99</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line33">line 33</a>
     </li></ul></dd>
     
 
@@ -2109,23 +4217,503 @@ This is useful for cleaning up code blocks formatted with Markdown.
 
 
 
+            
+                
+<h4 class="name" id="ComposeBackupStore">ComposeBackupStore</h4>
+
+
+
+
+<div class="description">
+    ComposeBackupStore shape used by the module
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
 
 
 
 
 
+    <h5 class="subsection-title">Properties:</h5>
 
-
-
-
-
-
-
-
-
-        
     
 
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>lastBackup</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+|
+
+<span class="param-type">null</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>saveBackup</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">saves the current compose HTML</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>restoreBackup</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">restores the last backup, resolves true on success</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line12">line 12</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="NormalizedResult">NormalizedResult</h4>
+
+
+
+
+<div class="description">
+    Normalized model result when returned by the proxy or normalized by the client
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>text</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">plain text response from the model</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>functionCall</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">function call payload when model requests an action</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line26">line 26</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="SetDraftOptions">SetDraftOptions</h4>
+
+
+
+
+<div class="description">
+    Options for setDraftBody
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>createBackup</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">whether to save a backup before applying the draft</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line20">line 20</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
     
 
     
@@ -2139,13 +4727,13 @@ This is useful for cleaning up code blocks formatted with Markdown.
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#callCustomEndpoint">callCustomEndpoint</a></li><li><a href="global.html#callGeminiAPI">callGeminiAPI</a></li><li><a href="global.html#getEmailBody">getEmailBody</a></li><li><a href="global.html#getSuggestedSubjectFromItem">getSuggestedSubjectFromItem</a></li><li><a href="global.html#getVar">getVar</a></li><li><a href="global.html#loadConfig">loadConfig</a></li><li><a href="global.html#log">log</a></li><li><a href="global.html#openComposeWithHtml">openComposeWithHtml</a></li><li><a href="global.html#registerThemeChangeHandler">registerThemeChangeHandler</a></li><li><a href="global.html#removeHtmlFences">removeHtmlFences</a></li><li><a href="global.html#setMetaData">setMetaData</a></li><li><a href="global.html#showError">showError</a></li><li><a href="global.html#updateThemeStyles">updateThemeStyles</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#appendMessage">appendMessage</a></li><li><a href="global.html#applyOfficeThemeVars">applyOfficeThemeVars</a></li><li><a href="global.html#callCustomEndpoint">callCustomEndpoint</a></li><li><a href="global.html#callGeminiAPI">callGeminiAPI</a></li><li><a href="global.html#capHistory">capHistory</a></li><li><a href="global.html#composeBackupStore">composeBackupStore</a></li><li><a href="global.html#configMap">configMap</a></li><li><a href="global.html#draft">draft</a></li><li><a href="global.html#fetchWithTimeout">fetchWithTimeout</a></li><li><a href="global.html#getEmailBody">getEmailBody</a></li><li><a href="global.html#getSuggestedSubjectFromItem">getSuggestedSubjectFromItem</a></li><li><a href="global.html#getVar">getVar</a></li><li><a href="global.html#handleChatQuery">handleChatQuery</a></li><li><a href="global.html#isRetriableStatus">isRetriableStatus</a></li><li><a href="global.html#loadConfig">loadConfig</a></li><li><a href="global.html#log">log</a></li><li><a href="global.html#normalizeModelResult">normalizeModelResult</a></li><li><a href="global.html#openComposeWithHtml">openComposeWithHtml</a></li><li><a href="global.html#registerThemeChangeHandler">registerThemeChangeHandler</a></li><li><a href="global.html#removeHtmlFences">removeHtmlFences</a></li><li><a href="global.html#sanitizeHtml">sanitizeHtml</a></li><li><a href="global.html#sending">sending</a></li><li><a href="global.html#setDraftBody">setDraftBody</a></li><li><a href="global.html#setMetaData">setMetaData</a></li><li><a href="global.html#showError">showError</a></li><li><a href="global.html#showUndoToast">showUndoToast</a></li><li><a href="global.html#wireChatToggle">wireChatToggle</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Tue Sep 30 2025 19:22:14 GMT+0100 (British Summer Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Oct 01 2025 15:37:41 GMT+0100 (British Summer Time)
 </footer>
 
 <script> prettyPrint(); </script>
