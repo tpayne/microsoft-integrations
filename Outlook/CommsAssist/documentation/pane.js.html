@@ -874,13 +874,13 @@ async function applyAssistantHtmlFromText(assistantText, item) {
 
 // Helper to check for editing intent in the user's query
 const EDITING_INTENT_PATTERN = /(change|edit|modify|rewrite|update|remove|add|summarize|alter)/i;
+let sending = false;
 
 /**
  * Handle chat send and apply function-calls if returned.
  * Includes a robust fallback when model refuses to call the tool.
  * @returns {Promise&lt;void>}
  */
-let sending = false;
 async function handleChatQuery() {
   const input = document.getElementById("chatInput");
   const sendBtn = document.getElementById("chatSendBtn");
@@ -978,10 +978,25 @@ async function handleChatQuery() {
     }
 
     // 4. Robust Fallback: Model returned text (or tool call was ignored)
-    const textFallback = extractModelText(normalized) || "";
+    let textFallback = extractModelText(normalized) || ""; // Changed 'const' to 'let'
     if (textFallback) {
         
       if (intentToEdit) {
+          
+          // FIX: Check for the conversational refusal *and* extract the following draft.
+          // This handles cases like: "I am unable to modify the draft... however, here is the reply:\n\nHi Jim,..."
+          const refusalPattern = /I (am|am not) able to modify|tool (is|is not) available|I cannot modify|here is the (draft|reply|suggestion)[:\s]*/i;
+          const refusalMatch = textFallback.match(refusalPattern);
+          if (refusalMatch) {
+              // Extract the content *after* the refusal/explanation
+              const postRefusalContent = textFallback.substring(refusalMatch.index + refusalMatch[0].length).trim();
+              if (postRefusalContent.length > 50) {
+                  // Prioritize the post-refusal content as the true draft
+                  textFallback = postRefusalContent;
+                  log("Overrode textFallback with content found after conversational refusal.");
+              }
+          }
+          // End of FIX
           
           // Attempt 1: Check for embedded JSON
           const parsed = tryParseJsonFromText(textFallback);
@@ -1346,13 +1361,13 @@ function showUndoToast() {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#appendMessage">appendMessage</a></li><li><a href="global.html#applyAssistantHtmlFromText">applyAssistantHtmlFromText</a></li><li><a href="global.html#applyComposeHtml">applyComposeHtml</a></li><li><a href="global.html#applyOfficeThemeVars">applyOfficeThemeVars</a></li><li><a href="global.html#callCustomEndpoint">callCustomEndpoint</a></li><li><a href="global.html#callGeminiAPI">callGeminiAPI</a></li><li><a href="global.html#capHistory">capHistory</a></li><li><a href="global.html#composeBackupStore">composeBackupStore</a></li><li><a href="global.html#configMap">configMap</a></li><li><a href="global.html#draft">draft</a></li><li><a href="global.html#editSystemInstruction">editSystemInstruction</a></li><li><a href="global.html#extractHtmlFromToolCode">extractHtmlFromToolCode</a></li><li><a href="global.html#extractModelText">extractModelText</a></li><li><a href="global.html#fetchWithTimeout">fetchWithTimeout</a></li><li><a href="global.html#getCurrentComposeHtml">getCurrentComposeHtml</a></li><li><a href="global.html#getEmailBody">getEmailBody</a></li><li><a href="global.html#getSuggestedSubjectFromItem">getSuggestedSubjectFromItem</a></li><li><a href="global.html#getVar">getVar</a></li><li><a href="global.html#isRetriableStatus">isRetriableStatus</a></li><li><a href="global.html#loadConfig">loadConfig</a></li><li><a href="global.html#log">log</a></li><li><a href="global.html#normalizeModelResult">normalizeModelResult</a></li><li><a href="global.html#openComposeWithHtml">openComposeWithHtml</a></li><li><a href="global.html#registerThemeChangeHandler">registerThemeChangeHandler</a></li><li><a href="global.html#removeHtmlFences">removeHtmlFences</a></li><li><a href="global.html#sanitizeHtml">sanitizeHtml</a></li><li><a href="global.html#sending">sending</a></li><li><a href="global.html#setMetaDataLocal">setMetaDataLocal</a></li><li><a href="global.html#showError">showError</a></li><li><a href="global.html#showUndoToast">showUndoToast</a></li><li><a href="global.html#tryParseJsonFromText">tryParseJsonFromText</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#appendMessage">appendMessage</a></li><li><a href="global.html#applyAssistantHtmlFromText">applyAssistantHtmlFromText</a></li><li><a href="global.html#applyComposeHtml">applyComposeHtml</a></li><li><a href="global.html#applyOfficeThemeVars">applyOfficeThemeVars</a></li><li><a href="global.html#callCustomEndpoint">callCustomEndpoint</a></li><li><a href="global.html#callGeminiAPI">callGeminiAPI</a></li><li><a href="global.html#capHistory">capHistory</a></li><li><a href="global.html#composeBackupStore">composeBackupStore</a></li><li><a href="global.html#configMap">configMap</a></li><li><a href="global.html#draft">draft</a></li><li><a href="global.html#editSystemInstruction">editSystemInstruction</a></li><li><a href="global.html#extractHtmlFromToolCode">extractHtmlFromToolCode</a></li><li><a href="global.html#extractModelText">extractModelText</a></li><li><a href="global.html#fetchWithTimeout">fetchWithTimeout</a></li><li><a href="global.html#getCurrentComposeHtml">getCurrentComposeHtml</a></li><li><a href="global.html#getEmailBody">getEmailBody</a></li><li><a href="global.html#getSuggestedSubjectFromItem">getSuggestedSubjectFromItem</a></li><li><a href="global.html#getVar">getVar</a></li><li><a href="global.html#handleChatQuery">handleChatQuery</a></li><li><a href="global.html#isRetriableStatus">isRetriableStatus</a></li><li><a href="global.html#loadConfig">loadConfig</a></li><li><a href="global.html#log">log</a></li><li><a href="global.html#normalizeModelResult">normalizeModelResult</a></li><li><a href="global.html#openComposeWithHtml">openComposeWithHtml</a></li><li><a href="global.html#registerThemeChangeHandler">registerThemeChangeHandler</a></li><li><a href="global.html#removeHtmlFences">removeHtmlFences</a></li><li><a href="global.html#sanitizeHtml">sanitizeHtml</a></li><li><a href="global.html#setMetaDataLocal">setMetaDataLocal</a></li><li><a href="global.html#showError">showError</a></li><li><a href="global.html#showUndoToast">showUndoToast</a></li><li><a href="global.html#tryParseJsonFromText">tryParseJsonFromText</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Thu Oct 02 2025 12:14:11 GMT+0100 (British Summer Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Thu Oct 02 2025 17:43:53 GMT+0100 (British Summer Time)
 </footer>
 
 <script> prettyPrint(); </script>

@@ -846,13 +846,13 @@ async function applyAssistantHtmlFromText(assistantText, item) {
 
 // Helper to check for editing intent in the user's query
 const EDITING_INTENT_PATTERN = /(change|edit|modify|rewrite|update|remove|add|summarize|alter)/i;
+let sending = false;
 
 /**
  * Handle chat send and apply function-calls if returned.
  * Includes a robust fallback when model refuses to call the tool.
  * @returns {Promise<void>}
  */
-let sending = false;
 async function handleChatQuery() {
   const input = document.getElementById("chatInput");
   const sendBtn = document.getElementById("chatSendBtn");
@@ -950,10 +950,25 @@ async function handleChatQuery() {
     }
 
     // 4. Robust Fallback: Model returned text (or tool call was ignored)
-    const textFallback = extractModelText(normalized) || "";
+    let textFallback = extractModelText(normalized) || ""; // Changed 'const' to 'let'
     if (textFallback) {
         
       if (intentToEdit) {
+          
+          // FIX: Check for the conversational refusal *and* extract the following draft.
+          // This handles cases like: "I am unable to modify the draft... however, here is the reply:\n\nHi Jim,..."
+          const refusalPattern = /I (am|am not) able to modify|tool (is|is not) available|I cannot modify|here is the (draft|reply|suggestion)[:\s]*/i;
+          const refusalMatch = textFallback.match(refusalPattern);
+          if (refusalMatch) {
+              // Extract the content *after* the refusal/explanation
+              const postRefusalContent = textFallback.substring(refusalMatch.index + refusalMatch[0].length).trim();
+              if (postRefusalContent.length > 50) {
+                  // Prioritize the post-refusal content as the true draft
+                  textFallback = postRefusalContent;
+                  log("Overrode textFallback with content found after conversational refusal.");
+              }
+          }
+          // End of FIX
           
           // Attempt 1: Check for embedded JSON
           const parsed = tryParseJsonFromText(textFallback);

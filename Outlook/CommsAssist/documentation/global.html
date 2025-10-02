@@ -373,69 +373,6 @@
 
 
         
-            
-<h4 class="name" id="sending"><span class="type-signature"></span>sending<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    Handle chat send and apply function-calls if returned.
-Includes a robust fallback when model refuses to call the tool.
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line855">line 855</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
     
 
     
@@ -2684,6 +2621,113 @@ Returns inner HTML or null.
     
 
     
+    <h4 class="name" id="handleChatQuery"><span class="type-signature">(async) </span>handleChatQuery<span class="signature">()</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Handle chat send and apply function-calls if returned.
+Includes a robust fallback when model refuses to call the tool.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line856">line 856</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
     <h4 class="name" id="isRetriableStatus"><span class="type-signature"></span>isRetriableStatus<span class="signature">(status)</span><span class="type-signature"> &rarr; {boolean}</span></h4>
     
 
@@ -3525,7 +3569,7 @@ Accepts candidate.content.parts, choice.message, groundingMetadata.searchEntryPo
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line1275">line 1275</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line1290">line 1290</a>
     </li></ul></dd>
     
 
@@ -4243,7 +4287,7 @@ Accepts candidate.content.parts, choice.message, groundingMetadata.searchEntryPo
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line1295">line 1295</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line1310">line 1310</a>
     </li></ul></dd>
     
 
@@ -4613,13 +4657,13 @@ Returns parsed object or null.
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#appendMessage">appendMessage</a></li><li><a href="global.html#applyAssistantHtmlFromText">applyAssistantHtmlFromText</a></li><li><a href="global.html#applyComposeHtml">applyComposeHtml</a></li><li><a href="global.html#applyOfficeThemeVars">applyOfficeThemeVars</a></li><li><a href="global.html#callCustomEndpoint">callCustomEndpoint</a></li><li><a href="global.html#callGeminiAPI">callGeminiAPI</a></li><li><a href="global.html#capHistory">capHistory</a></li><li><a href="global.html#composeBackupStore">composeBackupStore</a></li><li><a href="global.html#configMap">configMap</a></li><li><a href="global.html#draft">draft</a></li><li><a href="global.html#editSystemInstruction">editSystemInstruction</a></li><li><a href="global.html#extractHtmlFromToolCode">extractHtmlFromToolCode</a></li><li><a href="global.html#extractModelText">extractModelText</a></li><li><a href="global.html#fetchWithTimeout">fetchWithTimeout</a></li><li><a href="global.html#getCurrentComposeHtml">getCurrentComposeHtml</a></li><li><a href="global.html#getEmailBody">getEmailBody</a></li><li><a href="global.html#getSuggestedSubjectFromItem">getSuggestedSubjectFromItem</a></li><li><a href="global.html#getVar">getVar</a></li><li><a href="global.html#isRetriableStatus">isRetriableStatus</a></li><li><a href="global.html#loadConfig">loadConfig</a></li><li><a href="global.html#log">log</a></li><li><a href="global.html#normalizeModelResult">normalizeModelResult</a></li><li><a href="global.html#openComposeWithHtml">openComposeWithHtml</a></li><li><a href="global.html#registerThemeChangeHandler">registerThemeChangeHandler</a></li><li><a href="global.html#removeHtmlFences">removeHtmlFences</a></li><li><a href="global.html#sanitizeHtml">sanitizeHtml</a></li><li><a href="global.html#sending">sending</a></li><li><a href="global.html#setMetaDataLocal">setMetaDataLocal</a></li><li><a href="global.html#showError">showError</a></li><li><a href="global.html#showUndoToast">showUndoToast</a></li><li><a href="global.html#tryParseJsonFromText">tryParseJsonFromText</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#appendMessage">appendMessage</a></li><li><a href="global.html#applyAssistantHtmlFromText">applyAssistantHtmlFromText</a></li><li><a href="global.html#applyComposeHtml">applyComposeHtml</a></li><li><a href="global.html#applyOfficeThemeVars">applyOfficeThemeVars</a></li><li><a href="global.html#callCustomEndpoint">callCustomEndpoint</a></li><li><a href="global.html#callGeminiAPI">callGeminiAPI</a></li><li><a href="global.html#capHistory">capHistory</a></li><li><a href="global.html#composeBackupStore">composeBackupStore</a></li><li><a href="global.html#configMap">configMap</a></li><li><a href="global.html#draft">draft</a></li><li><a href="global.html#editSystemInstruction">editSystemInstruction</a></li><li><a href="global.html#extractHtmlFromToolCode">extractHtmlFromToolCode</a></li><li><a href="global.html#extractModelText">extractModelText</a></li><li><a href="global.html#fetchWithTimeout">fetchWithTimeout</a></li><li><a href="global.html#getCurrentComposeHtml">getCurrentComposeHtml</a></li><li><a href="global.html#getEmailBody">getEmailBody</a></li><li><a href="global.html#getSuggestedSubjectFromItem">getSuggestedSubjectFromItem</a></li><li><a href="global.html#getVar">getVar</a></li><li><a href="global.html#handleChatQuery">handleChatQuery</a></li><li><a href="global.html#isRetriableStatus">isRetriableStatus</a></li><li><a href="global.html#loadConfig">loadConfig</a></li><li><a href="global.html#log">log</a></li><li><a href="global.html#normalizeModelResult">normalizeModelResult</a></li><li><a href="global.html#openComposeWithHtml">openComposeWithHtml</a></li><li><a href="global.html#registerThemeChangeHandler">registerThemeChangeHandler</a></li><li><a href="global.html#removeHtmlFences">removeHtmlFences</a></li><li><a href="global.html#sanitizeHtml">sanitizeHtml</a></li><li><a href="global.html#setMetaDataLocal">setMetaDataLocal</a></li><li><a href="global.html#showError">showError</a></li><li><a href="global.html#showUndoToast">showUndoToast</a></li><li><a href="global.html#tryParseJsonFromText">tryParseJsonFromText</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Thu Oct 02 2025 12:14:11 GMT+0100 (British Summer Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Thu Oct 02 2025 17:43:53 GMT+0100 (British Summer Time)
 </footer>
 
 <script> prettyPrint(); </script>
