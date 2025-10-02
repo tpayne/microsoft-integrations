@@ -57,7 +57,7 @@ Once loaded, the "Communications Assistant" add-in appears in the Outlook ribbon
 
 ![Outlook sample](Images/Chatbot1.png)
 
-![Outlook sample](Images/Chatbot2.png)
+![Outlook sample](Images/Chatbot3.png)
 
 ![Draft Reply sample](Images/emailDraft.jpeg)
 
