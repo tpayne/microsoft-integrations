@@ -845,6 +845,10 @@ async function applyAssistantHtmlFromText(assistantText, item) {
    Chat handling with robust fallback
    ============================ */
 
+/* ============================
+   Chat handling with robust fallback
+   ============================ */
+
 /**
  * Handle chat send and apply function-calls if returned.
  * Includes a robust fallback when model refuses to call the tool.
@@ -866,8 +870,34 @@ async function handleChatQuery() {
   const thinkingEl = appendMessage("Thinking...", "ai");
 
   try {
-    const currentComposeHtml = await getCurrentComposeHtml();
-    const contextPrefix = currentComposeHtml ? `CURRENT_DRAFT_HTML:\n${currentComposeHtml}\n\n` : "";
+    // 1. Context Gathering:
+    const item = Office?.context?.mailbox?.item;
+    const isReadMode = item?.itemType === Office.MailboxEnums.ItemType.Message;
+    
+    // FIX: Base the draft content on the global 'draft' variable if it exists.
+    // This makes the AI's last successful output the source of truth for the *current* draft.
+    const currentDraftForAI = draft || "";
+    let contextPrefix = currentDraftForAI ? `CURRENT_DRAFT_HTML:\n${currentDraftForAI}\n\n` : "";
+
+    // If there is no draft yet, try to fetch the live content as a fallback for the first turn.
+    if (!currentDraftForAI) {
+      const currentComposeHtml = await getCurrentComposeHtml();
+      if (currentComposeHtml) {
+        contextPrefix = `CURRENT_DRAFT_HTML:\n${currentComposeHtml}\n\n`;
+      }
+    }
+
+    // Always include the incoming email body as CONTEXT if in Read Mode (replying/forwarding)
+    if (isReadMode) {
+        const emailBody = (await getEmailBody(item)).trim();
+        const name = item.from?.displayName || item.from?.emailAddress || "Sender";
+
+        contextPrefix +=
+            `INCOMING_EMAIL_FROM: ${name}\n` +
+            `INCOMING_EMAIL_BODY:\n${emailBody}\n\n`;
+    }
+    
+    // 2. API Call
     const chatSystemInstruction = getVar("chatSystemPrompt") || "You are a helpful assistant. If asked to modify the draft, return JSON as described in editSystemInstruction.";
     const combinedQuery = `${contextPrefix}${userQuery}\n\nYou have access to setDraftBody; return JSON when editing.`;
 
@@ -878,6 +908,7 @@ async function handleChatQuery() {
       return;
     }
 
+    // 3. Handle successful function call (preferred path)
     if (normalized.functionCall && normalized.functionCall.name === "setDraftBody") {
       const args = normalized.functionCall.args || {};
       const html = args.htmlContent || args.html || args.content || "";
@@ -886,7 +917,8 @@ async function handleChatQuery() {
       } else {
         try {
           await applyComposeHtml(html, { createBackup: true });
-          draft = html;
+          // CRITICAL: Guarantee draft is set here after a successful apply
+          draft = html; 
           if (thinkingEl) thinkingEl.textContent = "Draft updated in compose window.";
           showUndoToast();
         } catch (e) {
@@ -907,57 +939,61 @@ async function handleChatQuery() {
       return;
     }
 
-    // Fallback: model returned text (possibly refusal + HTML). Try applyAssistantHtmlFromText first.
+    // 4. Robust Fallback: Model returned text instead of a tool call
     const textFallback = extractModelText(normalized) || "";
     if (textFallback) {
-      const item = Office?.context?.mailbox?.item;
+      
+      // Attempt 1: Check for embedded JSON (most reliable fallback for refusal cases)
+      const parsed = tryParseJsonFromText(textFallback);
+      if (parsed && parsed.function === "setDraftBody" && parsed.args?.htmlContent) {
+        const html = parsed.args.htmlContent;
+        try {
+          await applyComposeHtml(html, { createBackup: true });
+          // CRITICAL: Guarantee draft is set here after a successful apply
+          draft = html; 
+          showUndoToast();
+          if (thinkingEl) thinkingEl.textContent = parsed.explanation || "Draft updated via fallback (embedded JSON).";
+        } catch (e) {
+          draft = html;
+          const cleaned = sanitizeHtml(html);
+          const item2 = Office?.context?.mailbox?.item;
+          if (item2) openComposeWithHtml(item2, cleaned, getSuggestedSubjectFromItem(item2));
+          showUndoToast();
+          if (thinkingEl) thinkingEl.textContent = "Draft created (fallback, embedded JSON).";
+        }
+        return;
+      }
+      
+      // Attempt 2: Try to apply any embedded HTML (e.g., in markdown fences)
       const applied = await applyAssistantHtmlFromText(textFallback, item);
       if (applied) {
-        if (thinkingEl) thinkingEl.textContent = "Applied assistant's suggested draft.";
-        try { draft = (await getCurrentComposeHtml()) || draft; } catch (e) { /* getCurrentComposeHtml failed */ } // Fixed: Empty block statement and unused var
+        if (thinkingEl) thinkingEl.textContent = "Applied assistant's suggested draft (embedded HTML).";
+        // CRITICAL: Since applyAssistantHtmlFromText may not return the final HTML, re-fetch or use the text for draft
+        draft = extractHtmlFromText(textFallback) || draft; // Use the extracted HTML if possible
         return;
       }
 
-      // If no HTML applied, keep existing fallback behavior: try to parse embedded JSON
-      if (/unable to modify|cannot modify|not defined|I am unable to modify|I cannot modify/i.test(textFallback)) {
-        const parsed = tryParseJsonFromText(textFallback);
-        if (parsed && parsed.function === "setDraftBody" && parsed.args?.htmlContent) {
-          const html = parsed.args.htmlContent;
-          try {
-            await applyComposeHtml(html, { createBackup: true });
-            draft = html;
-            showUndoToast();
-            if (thinkingEl) thinkingEl.textContent = parsed.explanation || "Draft updated.";
-          } catch (e) {
-            draft = html;
-            const cleaned = sanitizeHtml(html);
-            const item2 = Office?.context?.mailbox?.item;
-            if (item2) openComposeWithHtml(item2, cleaned, getSuggestedSubjectFromItem(item2));
-            showUndoToast();
-            if (thinkingEl) thinkingEl.textContent = "Draft created (fallback).";
-          }
-          return;
-        }
-      }
-
-      if (textFallback && textFallback.length > 20) {
+      // Attempt 3: Final heuristic - if the text is long (>50 chars), assume it's a draft and try to apply it
+      if (textFallback.length > 50) {
         const cleanedHtml = sanitizeHtml(removeHtmlFences(textFallback));
         try {
           await applyComposeHtml(cleanedHtml, { createBackup: true });
-          draft = cleanedHtml;
+          // CRITICAL: Guarantee draft is set here after a successful apply
+          draft = cleanedHtml; 
           showUndoToast();
-          if (thinkingEl) thinkingEl.textContent = "Applied assistant's suggested draft.";
+          if (thinkingEl) thinkingEl.textContent = "Applied assistant's suggested draft (long text).";
         } catch (e) {
           const item3 = Office?.context?.mailbox?.item;
           if (item3) openComposeWithHtml(item3, cleanedHtml, getSuggestedSubjectFromItem(item3));
           draft = cleanedHtml;
           showUndoToast();
-          if (thinkingEl) thinkingEl.textContent = "Opened compose with assistant's suggestion.";
+          if (thinkingEl) thinkingEl.textContent = "Opened compose with assistant's suggestion (long text fallback).";
         }
         return;
       }
     }
 
+    // 5. Default Chat Reply
     const replyText = extractModelText(normalized) || "I couldn't generate a response.";
     if (thinkingEl) thinkingEl.textContent = replyText;
   } catch (err) {
