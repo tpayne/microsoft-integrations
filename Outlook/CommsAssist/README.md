@@ -4,11 +4,7 @@ This project is a sample Outlook add-in that leverages the Gemini API to provide
 
 ## I. Overview
 
-The add-in appears as a task pane in Outlook when reading an email. Its main function is to analyze the email content and suggest a professional response using Google's Gemini AI.
-
-**Main Features:**
-- **Quick Reply:** Calls the Gemini API to generate a concise, professional draft. Opens a "Reply All" window with the suggested response pre-filled.
-- **Generate IT Response:** Generates a draft using Gemini API and displays it in the task pane for review before use.
+The add-in appears as a task pane in Outlook when reading an an email. Its main function is to analyze the email content and provide intelligent assistance using Google's Gemini AI. The tool is now highly robust in a compose/reply context, using a strict internal mechanism to **track the latest edited draft** and prevent general chat queries from inadvertently modifying the email body.
 
 The add-in uses Office.js to read the subject, sender, and body of the current email, creating a detailed prompt for the AI model. It works only in Read Mode and notifies users if accessed in Compose Mode.
 
@@ -35,7 +31,7 @@ To test the add-in locally, follow these steps:
     ```bash
     npm run certs
     ```
-    Uses mkcert for trusted HTTPS certificates. You may need to modify the `package.json` for the location of `mkcerts`
+    Uses mkcert for trusted HTTPS certificates. You may need to modify the `package.json` for the location of `mkcerts`.
 
 3. **Build the Project:**
     ```bash
@@ -51,32 +47,27 @@ To test the add-in locally, follow these steps:
 
 5. **Sideload the Add-in in Outlook:**
 
-    - **Outlook Web:**  
-      Go to Settings > Mail > Customize actions > Add-ins > + Add a custom add-in > Add from file...  
+    - **Outlook Web:** Go to Settings > Mail > Customize actions > Add-ins > + Add a custom add-in > Add from file...  
       Select `manifest.xml` from the project root.
 
-    - **Outlook Desktop:**  
-      Go to File > Options > Customize Ribbon (Windows) or Tools > Get Add-ins (macOS).  
+    - **Outlook Desktop:** Go to File > Options > Customize Ribbon (Windows) or Tools > Get Add-ins (macOS).  
       Upload `manifest.xml` as prompted.
 
 Once loaded, the "Communications Assistant" add-in appears in the Outlook ribbon when reading an email.
 
-![Outlook sample](Images/email.jpeg)
+![Outlook sample](Images/Chatbot1.png)
 
+![Outlook sample](Images/Chatbot2.png)
 
 ![Draft Reply sample](Images/emailDraft.jpeg)
-
-![Outlook sample](Images/outlook.png)
 
 ## III. Deploying to Outlook
 
 For production deployment:
 
-1. **Host Files:**  
-    Upload `dist/public` contents to a secure HTTPS web server.
+1. **Host Files:** Upload `dist/public` contents to a secure HTTPS web server.
 
-2. **Update Manifest:**  
-    Replace all `https://localhost:3000/` URLs in `manifest.xml` with your hosted URL (e.g., `https://yourdomain.com/outlook-addin/`).
+2. **Update Manifest:** Replace all `https://localhost:3000/` URLs in `manifest.xml` with your hosted URL (e.g., `https://yourdomain.com/outlook-addin/`).
 
 3. **Deploy Add-in:**
     - **Organizational:** Admin uploads the updated manifest to Microsoft 365 admin center for all users.
@@ -84,20 +75,15 @@ For production deployment:
 
 ## IV. Production Considerations
 
-- **API Key Management:**  
-  Do not hardcode the Gemini API key in client-side code. Use a secure backend service to handle API requests.
+- **API Key Management:** Do not hardcode the Gemini API key in client-side code. Use a secure backend service to handle API requests.
 
-- **Error Handling & Feedback:**  
-  Improve error messages and implement centralized logging.
+- **Error Handling & Feedback:** Improve error messages and implement centralized logging.
 
-- **UI/UX Enhancements:**  
-  Add loading indicators, improve design, and allow editing drafts within the task pane.
+- **UI/UX Enhancements:** Add loading indicators, improve design, and allow editing drafts within the task pane.
 
-- **Scalability & Performance:**  
-  Implement advanced retry, rate-limiting, and monitoring strategies.
+- **Scalability & Performance:** Implement advanced retry, rate-limiting, and monitoring strategies.
 
-- **Manifest & Icons:**  
-  Ensure referenced icon files (icon-16.png, icon-32.png, icon-80.png) are created and hosted.
+- **Manifest & Icons:** Ensure referenced icon files (icon-16.png, icon-32.png, icon-80.png) are created and hosted.
 
 ## V. CloudRun Deployment
 
