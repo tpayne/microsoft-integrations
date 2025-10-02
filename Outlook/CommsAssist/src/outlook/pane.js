@@ -43,11 +43,10 @@ const DEFAULT_MAX_ATTEMPTS = 6;
  * @type {string}
  */
 const editSystemInstruction =
-  "You are an assistant embedded in a client that will apply edits. " +
-  "When you should modify the draft, RETURN ONLY a single JSON object and nothing else with this exact shape: " +
-  '{"function":"setDraftBody","args":{"htmlContent":"<full HTML>"},"explanation":"one-sentence summary"}' +
-  ". The client will call setDraftBody with that JSON and apply the HTML; do not say you cannot call tools. " +
-  "If you only want to provide suggestions, return plain text only.";
+  "You are an assistant embedded in a client. Your primary task is to answer user questions." +
+  "The current draft and original email context are provided for your reference, but **DO NOT** mention them unless asked to edit them." +
+  "**STRICT RULE:** You MUST call the `setDraftBody` tool with the modified HTML content ONLY IF the user's query explicitly asks you to **change**, **edit**, **summarize**, **rewrite**, or **modify** the content. " +
+  "For all general queries (e.g., 'What is the date?', 'Who is the sender?'), you must return a plain text response and **NEVER** use the `setDraftBody` tool.";
 
 /* ============================
    Utilities
@@ -845,9 +844,8 @@ async function applyAssistantHtmlFromText(assistantText, item) {
    Chat handling with robust fallback
    ============================ */
 
-/* ============================
-   Chat handling with robust fallback
-   ============================ */
+// Helper to check for editing intent in the user's query
+const EDITING_INTENT_PATTERN = /(change|edit|modify|rewrite|update|remove|add|summarize|alter)/i;
 
 /**
  * Handle chat send and apply function-calls if returned.
@@ -874,20 +872,17 @@ async function handleChatQuery() {
     const item = Office?.context?.mailbox?.item;
     const isReadMode = item?.itemType === Office.MailboxEnums.ItemType.Message;
     
-    // FIX: Base the draft content on the global 'draft' variable if it exists.
-    // This makes the AI's last successful output the source of truth for the *current* draft.
-    const currentDraftForAI = draft || "";
-    let contextPrefix = currentDraftForAI ? `CURRENT_DRAFT_HTML:\n${currentDraftForAI}\n\n` : "";
-
-    // If there is no draft yet, try to fetch the live content as a fallback for the first turn.
-    if (!currentDraftForAI) {
-      const currentComposeHtml = await getCurrentComposeHtml();
-      if (currentComposeHtml) {
-        contextPrefix = `CURRENT_DRAFT_HTML:\n${currentComposeHtml}\n\n`;
-      }
+    // FIX: Use the global 'draft' as the single source of truth for the editable content.
+    // Only fetch live content if 'draft' is empty (i.e., the very first chat turn).
+    let editableContent = draft; 
+    
+    if (!editableContent) {
+      editableContent = await getCurrentComposeHtml() || "";
     }
 
-    // Always include the incoming email body as CONTEXT if in Read Mode (replying/forwarding)
+    let contextPrefix = editableContent ? `CURRENT_DRAFT_HTML:\n${editableContent}\n\n` : "";
+
+    // The original email body is included as separate CONTEXT, NEVER as the editable draft.
     if (isReadMode) {
         const emailBody = (await getEmailBody(item)).trim();
         const name = item.from?.displayName || item.from?.emailAddress || "Sender";
@@ -897,9 +892,17 @@ async function handleChatQuery() {
             `INCOMING_EMAIL_BODY:\n${emailBody}\n\n`;
     }
     
-    // 2. API Call
-    const chatSystemInstruction = getVar("chatSystemPrompt") || "You are a helpful assistant. If asked to modify the draft, return JSON as described in editSystemInstruction.";
-    const combinedQuery = `${contextPrefix}${userQuery}\n\nYou have access to setDraftBody; return JSON when editing.`;
+    // 2. API Call (Injection and Execution)
+    const intentToEdit = EDITING_INTENT_PATTERN.test(userQuery);
+    let specialInstruction = "";
+    
+    if (intentToEdit) {
+        // Strong instruction to suppress conversational text and force tool/draft output
+        specialInstruction = "You have detected an editing request. You MUST respond with a setDraftBody function call or the draft body HTML/JSON wrapped in fences. DO NOT reply with conversational text or apologies. Be concise and execute the task.";
+    }
+
+    const chatSystemInstruction = getVar("chatSystemPrompt") || editSystemInstruction;
+    const combinedQuery = `${contextPrefix}${userQuery}\n\n${specialInstruction}\n\nYou have access to setDraftBody; return JSON when editing.`;
 
     const raw = await callGeminiAPI(combinedQuery, chatSystemInstruction, { timeoutMs: REQUEST_TIMEOUT_MS });
     const normalized = raw && (raw.text || raw.functionCall) ? raw : normalizeModelResult(raw);
@@ -910,92 +913,101 @@ async function handleChatQuery() {
 
     // 3. Handle successful function call (preferred path)
     if (normalized.functionCall && normalized.functionCall.name === "setDraftBody") {
-      const args = normalized.functionCall.args || {};
-      const html = args.htmlContent || args.html || args.content || "";
-      if (!html) {
-        if (thinkingEl) thinkingEl.textContent = "Assistant attempted to modify draft but returned no content.";
+      
+      // === CLIENT-SIDE TOOL GUARDRAIL ===
+      if (!intentToEdit) { 
+        log("Ignoring setDraftBody tool call: No editing intent in user query.");
+        delete normalized.functionCall; 
       } else {
-        try {
-          await applyComposeHtml(html, { createBackup: true });
-          // CRITICAL: Guarantee draft is set here after a successful apply
-          draft = html; 
-          if (thinkingEl) thinkingEl.textContent = "Draft updated in compose window.";
-          showUndoToast();
-        } catch (e) {
-          log("applyComposeHtml failed; falling back to openComposeWithHtml: " + (e && e.message));
-          draft = html;
-          const cleaned = sanitizeHtml(html);
+        // Intent confirmed: proceed with tool execution
+        const args = normalized.functionCall.args || {};
+        const html = args.htmlContent || args.html || args.content || "";
+        if (!html) {
+          if (thinkingEl) thinkingEl.textContent = "Assistant attempted to modify draft but returned no content.";
+        } else {
           try {
-            const item = Office?.context?.mailbox?.item;
-            if (item) openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item));
-            if (thinkingEl) thinkingEl.textContent = "Draft created (fallback). Opening compose window...";
+            await applyComposeHtml(html, { createBackup: true });
+            draft = html; // CRITICAL: Update global draft state
+            if (thinkingEl) thinkingEl.textContent = "Draft updated in compose window.";
             showUndoToast();
-          } catch (openErr) {
-            log("Fallback openComposeWithHtml failed: " + (openErr && openErr.message));
-            if (thinkingEl) thinkingEl.textContent = "Failed to apply draft. See console.";
+          } catch (e) {
+            log("applyComposeHtml failed; falling back to openComposeWithHtml: " + (e && e.message));
+            draft = html;
+            const cleaned = sanitizeHtml(html);
+            try {
+              const item = Office?.context?.mailbox?.item;
+              if (item) openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item));
+              if (thinkingEl) thinkingEl.textContent = "Draft created (fallback). Opening compose window...";
+              showUndoToast();
+            } catch (openErr) {
+              log("Fallback openComposeWithHtml failed: " + (openErr && openErr.message));
+              if (thinkingEl) thinkingEl.textContent = "Failed to apply draft. See console.";
+            }
           }
         }
+        return; 
       }
-      return;
     }
 
-    // 4. Robust Fallback: Model returned text instead of a tool call
+    // 4. Robust Fallback: Model returned text (or tool call was ignored)
     const textFallback = extractModelText(normalized) || "";
     if (textFallback) {
-      
-      // Attempt 1: Check for embedded JSON (most reliable fallback for refusal cases)
-      const parsed = tryParseJsonFromText(textFallback);
-      if (parsed && parsed.function === "setDraftBody" && parsed.args?.htmlContent) {
-        const html = parsed.args.htmlContent;
-        try {
-          await applyComposeHtml(html, { createBackup: true });
-          // CRITICAL: Guarantee draft is set here after a successful apply
-          draft = html; 
-          showUndoToast();
-          if (thinkingEl) thinkingEl.textContent = parsed.explanation || "Draft updated via fallback (embedded JSON).";
-        } catch (e) {
-          draft = html;
-          const cleaned = sanitizeHtml(html);
-          const item2 = Office?.context?.mailbox?.item;
-          if (item2) openComposeWithHtml(item2, cleaned, getSuggestedSubjectFromItem(item2));
-          showUndoToast();
-          if (thinkingEl) thinkingEl.textContent = "Draft created (fallback, embedded JSON).";
-        }
-        return;
-      }
-      
-      // Attempt 2: Try to apply any embedded HTML (e.g., in markdown fences)
-      const applied = await applyAssistantHtmlFromText(textFallback, item);
-      if (applied) {
-        if (thinkingEl) thinkingEl.textContent = "Applied assistant's suggested draft (embedded HTML).";
-        // CRITICAL: Since applyAssistantHtmlFromText may not return the final HTML, re-fetch or use the text for draft
-        draft = extractHtmlFromText(textFallback) || draft; // Use the extracted HTML if possible
-        return;
+        
+      if (intentToEdit) {
+          
+          // Attempt 1: Check for embedded JSON
+          const parsed = tryParseJsonFromText(textFallback);
+          if (parsed && parsed.function === "setDraftBody" && parsed.args?.htmlContent) {
+            const html = parsed.args.htmlContent;
+            try {
+              await applyComposeHtml(html, { createBackup: true });
+              draft = html; // CRITICAL: Update global draft state
+              showUndoToast();
+              if (thinkingEl) thinkingEl.textContent = parsed.explanation || "Draft updated via fallback (embedded JSON).";
+            } catch (e) {
+              draft = html;
+              const cleaned = sanitizeHtml(html);
+              const item2 = Office?.context?.mailbox?.item;
+              if (item2) openComposeWithHtml(item2, cleaned, getSuggestedSubjectFromItem(item2));
+              showUndoToast();
+              if (thinkingEl) thinkingEl.textContent = "Draft created (fallback, embedded JSON).";
+            }
+            return;
+          }
+          
+          // Attempt 2: Try to apply any embedded HTML
+          const applied = await applyAssistantHtmlFromText(textFallback, item);
+          if (applied) {
+            if (thinkingEl) thinkingEl.textContent = "Applied assistant's suggested draft (embedded HTML).";
+            // FIX: Use getCurrentComposeHtml to update local draft variable
+            draft = (await getCurrentComposeHtml()) || draft; 
+            return;
+          }
+
+          // Attempt 3: Final heuristic - if the text is long (>50 chars), assume it's a draft and try to apply it
+          if (textFallback.length > 50) {
+            const cleanedHtml = sanitizeHtml(removeHtmlFences(textFallback));
+            try {
+              await applyComposeHtml(cleanedHtml, { createBackup: true });
+              draft = cleanedHtml; // CRITICAL: Update global draft state
+              showUndoToast();
+              if (thinkingEl) thinkingEl.textContent = "Applied assistant's suggested draft (long text).";
+            } catch (e) {
+              const item3 = Office?.context?.mailbox?.item;
+              if (item3) openComposeWithHtml(item3, cleanedHtml, getSuggestedSubjectFromItem(item3));
+              draft = cleanedHtml;
+              showUndoToast();
+              if (thinkingEl) thinkingEl.textContent = "Opened compose with assistant's suggestion (long text fallback).";
+            }
+            return;
+          }
       }
 
-      // Attempt 3: Final heuristic - if the text is long (>50 chars), assume it's a draft and try to apply it
-      if (textFallback.length > 50) {
-        const cleanedHtml = sanitizeHtml(removeHtmlFences(textFallback));
-        try {
-          await applyComposeHtml(cleanedHtml, { createBackup: true });
-          // CRITICAL: Guarantee draft is set here after a successful apply
-          draft = cleanedHtml; 
-          showUndoToast();
-          if (thinkingEl) thinkingEl.textContent = "Applied assistant's suggested draft (long text).";
-        } catch (e) {
-          const item3 = Office?.context?.mailbox?.item;
-          if (item3) openComposeWithHtml(item3, cleanedHtml, getSuggestedSubjectFromItem(item3));
-          draft = cleanedHtml;
-          showUndoToast();
-          if (thinkingEl) thinkingEl.textContent = "Opened compose with assistant's suggestion (long text fallback).";
-        }
-        return;
-      }
+      // 5. Default Chat Reply
+      const replyText = extractModelText(normalized) || "I couldn't generate a response.";
+      if (thinkingEl) thinkingEl.textContent = replyText;
     }
 
-    // 5. Default Chat Reply
-    const replyText = extractModelText(normalized) || "I couldn't generate a response.";
-    if (thinkingEl) thinkingEl.textContent = replyText;
   } catch (err) {
     const history = document.getElementById("chatHistory");
     if (history?.lastChild) history.lastChild.textContent = "Error: Could not connect to the assistant.";
