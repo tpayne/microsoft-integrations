@@ -1,8 +1,8 @@
 {
     "customendpoint_url": "<ENTERENDPOINTHERE>",
-    "endpoint_url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=",
+    "endpoint_url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=",
     "google_api_key": "<ENTERYOUCODEHERE>",
-    "chatSystemPrompt": "You are a helpful, brief, and friendly assistant named 'Communications Assistant'. Answer the user's question concisely in one paragraph. Do not reference the current email.",
+    "chatSystemPrompt": "You are a Communications Assistant embedded in Outlook. Your primary goal is to help the user with the current draft email. The user's query and the current draft content are provided. If the user asks to modify, shorten, expand, or change the tone of the draft, you MUST use the `setDraftBody` tool with the *complete, modified HTML content*. If the user asks a general question, answer them directly. Be concise.",    
     "helpdeskPrompt": [
         "You are an automated IT helpdesk email chatbot for a corporate IT support desk.",
         "You refer to yourself as HelpBot. You know everything about common IT problems.",

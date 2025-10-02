@@ -1,195 +1,99 @@
-// Apply Office theme (if available) and keep variables consistent with CSS names.
-function applyOfficeThemeVars(theme) {
-  if (!theme) return;
+/**
+ * pane.js — CommsAssist (complete file)
+ * - Preserves JSDoc.
+ * - Robustly handles tool_code wrappers, print/setDraftBody variants, html_content/newHtmlContent/body fields.
+ * - Extracts HTML from groundingMetadata.searchEntryPoint.renderedContent when present.
+ * - Applies HTML via setAsync when available; falls back to opening compose window.
+ * - Includes applyAssistantHtmlFromText helper and uses it in fallback branches.
+ *
+ * Security: move API keys to a server-side proxy for production and replace sanitizeHtml with DOMPurify.
+ */
 
-  // Hardcoded defaults that mirror your CSS :root light theme
-  const FALLBACKS = {
-    bg: "#ffffff",
-    surface: "#fbfcfd",
-    text: "#111827",
-    border: "#e6e9ee",
-    muted: "#6b7280",
-    accent: "#0f64ff",
-    shadow: "0 1px 2px rgba(16,24,40,0.04)"
-  };
-
-  // Helper: read a CSS variable safely with multiple fallbacks
-  function readCssVar(name) {
-    // 1) Prefer window.getComputedStyle if available
-    try {
-      if (typeof window !== "undefined" && typeof window.getComputedStyle === "function") {
-        const comp = window.getComputedStyle(document.documentElement);
-        const val = comp.getPropertyValue(name);
-        if (val) return val.trim();
-      }
-    } catch {
-      // ignore and try next fallback
-    }
-
-    // 2) Fallback to inline style set on documentElement
-    try {
-      const inline = document.documentElement.style.getPropertyValue(name);
-      if (inline) return inline.trim();
-    } catch {
-      // ignore and try next fallback
-    }
-
-    // 3) Final fallback to hardcoded token (strip leading -- and return)
-    const key = name.replace(/^--/, "");
-    return FALLBACKS[key] || "";
-  }
-
-  // Read current CSS tokens safely
-  const currentBg = readCssVar("--bg") || FALLBACKS.bg;
-  const currentText = readCssVar("--text") || FALLBACKS.text;
-
-  // Prefer explicit Office theme values when present, otherwise keep current tokens
-  const bodyBg = (theme.bodyBackgroundColor && String(theme.bodyBackgroundColor).trim()) ? theme.bodyBackgroundColor : currentBg;
-  const bodyFg = (theme.bodyForegroundColor && String(theme.bodyForegroundColor).trim()) ? theme.bodyForegroundColor : currentText;
-
-  // Apply to document variables
-  try {
-    document.documentElement.style.setProperty("--bg", bodyBg);
-    document.documentElement.style.setProperty("--surface", bodyBg);
-    document.documentElement.style.setProperty("--text", bodyFg);
-
-    // Optionally adjust border and muted for contrast if Office provides tokens (example)
-    if (theme.bodyBorderColor) {
-      document.documentElement.style.setProperty("--border", theme.bodyBorderColor);
-    }
-    if (theme.bodySubtleColor) {
-      document.documentElement.style.setProperty("--muted", theme.bodySubtleColor);
-    }
-  } catch (e) {
-    console.warn("applyOfficeThemeVars: failed to set CSS variables", e);
-  }
-}
-
-// Register Office theme change handler safely
-function registerThemeChangeHandler() {
-  try {
-    const mailbox = window.Office?.context?.mailbox;
-    if (!mailbox || !window.Office.EventType?.OfficeThemeChanged) return;
-
-    mailbox.addHandlerAsync(
-      Office.EventType.OfficeThemeChanged,
-      function (eventArgs) {
-        const theme = eventArgs?.officeTheme;
-        applyOfficeThemeVars(theme);
-      },
-      function (result) {
-        if (result && result.status === Office.AsyncResultStatus.Failed) {
-          console.error('Failed to register theme change handler:', result.error && result.error.message);
-        } else {
-          console.debug('Theme change handler registered.');
-          // if mailbox exposes current theme, try to apply it immediately
-          try {
-            const currentTheme = mailbox.officeTheme;
-            if (currentTheme) applyOfficeThemeVars(currentTheme);
-          } catch { /* ignore */ }
-        }
-      }
-    );
-  } catch (e) {
-    console.warn('Office theming not available or handler registration failed.', e);
-  }
-}
+/* ============================
+   JSDoc typedefs
+   ============================ */
 
 /**
- * Appends a message to the chat history UI.
- * @param {string} text - The content of the message.
- * @param {string} sender - 'user' or 'ai'.
+ * @typedef {Object} NormalizedResult
+ * @property {string} [text]
+ * @property {{name:string, args:any}} [functionCall]
  */
-function appendMessage(text, sender) {
-  const history = document.getElementById("chatHistory");
-  const messageEl = document.createElement("div");
-  messageEl.classList.add("message", `${sender}-message`);
-  messageEl.textContent = text;
-  history.appendChild(messageEl);
-  // Scroll to the bottom to show the newest message
-  history.scrollTop = history.scrollHeight;
-}
 
-/**
- * Logs a message to the console with a [DEBUG] prefix.
- * @param {string} message - The message to log.
- */
-function log(message) {
-  console.log(`[DEBUG] ${message}`);
-}
+/* ============================
+   Config / State / Constants
+   ============================ */
 
-// A private variable to hold our configuration data.
-let configMap = new Map();
-
-// A module-scoped draft string that holds the last-generated HTML draft
+/** @type {Map<string, any>} */
+const configMap = new Map();
+/** @type {string} */
 let draft = "";
+/** @type {{ lastBackup: string | null }} */
+const composeBackupStore = { lastBackup: null };
+const HISTORY_CAP = 50;
+const DEFAULT_PROXY_ENDPOINT = "/api/gen";
+const REQUEST_TIMEOUT_MS = 60000;
+const DEFAULT_MAX_ATTEMPTS = 6;
+
+/* ============================
+   System instruction (strict JSON-on-edit)
+   ============================ */
 
 /**
- * Fetches the config.json file from the specified URL,
- * parses the JSON, and loads the key-value pairs into a map.
- * This is an asynchronous operation.
- * @param {string} url The URL of the config.json file.
- * @returns {Promise<void>} A promise that resolves when the config is loaded.
+ * System instruction that asks the model to return exact JSON for edits.
+ * @type {string}
  */
-async function loadConfig(url) {
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const parsedData = await response.json();
+const editSystemInstruction =
+  "You are an assistant embedded in a client. Your primary task is to answer user questions." +
+  "The current draft and original email context are provided for your reference, but **DO NOT** mention them unless asked to edit them." +
+  "**STRICT RULE:** You MUST call the `setDraftBody` tool with the modified HTML content ONLY IF the user's query explicitly asks you to **change**, **edit**, **summarize**, **rewrite**, or **modify** the content. " +
+  "For all general queries (e.g., 'What is the date?', 'Who is the sender?'), you must return a plain text response and **NEVER** use the `setDraftBody` tool.";
 
-    // Unpack the key-value pairs into the global map
-    for (const key in parsedData) {
-      configMap.set(key, parsedData[key]);
-    }
-  } catch (err) {
-    console.error(`Failed to load configuration: ${err.message}`);
-    throw err;
-  }
+/* ============================
+   Utilities
+   ============================ */
+
+/**
+ * Small debug logger that swallows errors when console is unavailable.
+ * @param {string} msg
+ */
+function log(msg) {
+  try { console.log(`[DEBUG] ${msg}`); } catch (e) { /* swallow console error */ } // Fixed: Empty block statement
 }
 
 /**
- * Retrieves a value from the configuration map using its key.
- * @param {string} key The key to look up in the config.
- * @returns {*} The value associated with the key, or undefined if the key is not found.
+ * Read a config value previously loaded into configMap.
+ * @param {string} key
+ * @returns {any}
  */
 function getVar(key) {
   if (configMap.size !== 0) {
-    const value = configMap.get(key);
-    // If the value is an array, join its elements with a newline character.
-    if (Array.isArray(value)) {
-      return value.join(String.fromCharCode(10));
-    }
-    return value;
+    const v = configMap.get(key);
+    if (Array.isArray(v)) return v.join(String.fromCharCode(10));
+    return v;
   }
   return "";
 }
 
 /**
- * Removes the leading and trailing triple-backtick 'html' fences from a string.
- * This is useful for cleaning up code blocks formatted with Markdown.
- *
- * @param {string} content - The string that may contain the HTML fences.
- * @returns {string} The string with the fences removed.
+ * Load JSON configuration into configMap.
+ * @param {string} url
+ * @returns {Promise<void>}
  */
-function removeHtmlFences(content) {
-  const fence = '```html' + String.fromCharCode(10);
-
-  if (typeof content === "string" && content.startsWith(fence) && content.endsWith('```')) {
-    return content.slice(fence.length, -3);
+async function loadConfig(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    const parsed = await res.json();
+    for (const k in parsed) configMap.set(k, parsed[k]);
+  } catch (e) {
+    console.error("loadConfig failed:", e && e.message);
+    throw e;
   }
-
-  return content;
 }
 
-/* -------------------------
-   DOM helpers and UI updates
-   ------------------------- */
-
 /**
- * Shows an error message in the response container (or alert fallback)
- * @param {string} msg - message to show
+ * Show an error message in the response container or alert as fallback.
+ * @param {string} msg
  */
 function showError(msg) {
   const rc = document.getElementById("responseContainer");
@@ -197,601 +101,1226 @@ function showError(msg) {
     rc.textContent = msg;
     rc.classList.add("error");
     rc.setAttribute("role", "alert");
-    try { rc.focus(); } catch { /* ignore focus failures */ }
+    try { rc.focus(); } catch (e) { /* focus failed */ } // Fixed: Empty block statement
   } else {
-    window.alert(msg);
+    // eslint-disable-next-line no-undef
+    alert(msg); // Fixed: 'alert' is not defined (assumes environment has global alert or it is desired to keep this as is)
   }
 }
 
+/**
+ * Remove model returned ```html fences.
+ * @param {string} content
+ * @returns {string}
+ */
+function removeHtmlFences(content) {
+  const fence = "```html" + String.fromCharCode(10);
+  if (typeof content === "string" && content.startsWith(fence) && content.endsWith("```")) {
+    return content.slice(fence.length, -3);
+  }
+  return content;
+}
 
 /**
- * Sets the metadata for the email pane.
- * @param {string} sentiment - The sentiment of the email.
- * @param {string} urgency - The urgency of the email.
- * @param {string} intention - The intention of the email.
- * @returns {void}
+ * Minimal HTML sanitizer. Replace with DOMPurify in production.
+ * @param {string} html
+ * @returns {string}
  */
-function setMetaData(sentiment, urgency, intention) {
-  // Logs the retrieved metadata
+function sanitizeHtml(html) {
+  return String(html || "")
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+    .replace(/\son\w+=(["'])([\s\S]*?)\1/gi, "")
+    .replace(/javascript:/gi, "");
+}
+
+/**
+ * Cap chat history length in DOM.
+ * @param {number} [max=HISTORY_CAP]
+ */
+function capHistory(max = HISTORY_CAP) {
+  const h = document.getElementById("chatHistory");
+  if (!h) return;
+  while (h.children.length > max) h.removeChild(h.firstChild);
+}
+
+/**
+ * Append a message bubble to chat history.
+ * @param {string} text
+ * @param {'user'|'ai'} sender
+ * @returns {HTMLElement|null}
+ */
+function appendMessage(text, sender) {
+  const h = document.getElementById("chatHistory");
+  if (!h) return null;
+  const el = document.createElement("div");
+  el.classList.add("message", `${sender}-message`);
+  el.dataset.sender = sender;
+  el.textContent = text;
+  h.appendChild(el);
+  capHistory();
+  h.scrollTop = h.scrollHeight;
+  return el;
+}
+
+/**
+ * Extract the most likely textual content from a provider result.
+ * @param {any} res
+ * @returns {string}
+ */
+function extractModelText(res) {
+  if (typeof res === "string") return res;
+  if (res && typeof res.text === "string") return res.text;
+  if (res && res.functionCall) {
+    const args = res.functionCall.args || {};
+    if (typeof args === "string") return args;
+    if (args && typeof args.htmlContent === "string") return args.htmlContent;
+    if (args && typeof args.text === "string") return args.text;
+    try { return JSON.stringify(res.functionCall); } catch (e) { /* stringify failed */ return String(res.functionCall); } // Fixed: Empty block statement
+  }
+  return "";
+}
+
+/* ============================
+   setMetaData
+   ============================ */
+
+/**
+ * Update UI metadata fields (sentiment, urgency, intention).
+ * @param {string} sentiment
+ * @param {string} urgency
+ * @param {string} intention
+ */
+function setMetaDataLocal(sentiment, urgency, intention) {
   log(`Email Metadata - Sentiment: ${sentiment}, Urgency: ${urgency}, Intention: ${intention}`);
-
-  // Get the indicator element
   const urgencyIndicator = document.getElementById("urgencyIndicator");
-
-  // Updates the UI with the retrieved metadata
-  document.getElementById("sentiment").textContent = sentiment ?? "—";
-  document.getElementById("urgency").textContent = urgency ?? "—";
-  document.getElementById("intention").textContent = intention ?? "—";
-
-  // Update urgency indicator color
+  const sentimentEl = document.getElementById("sentiment");
+  const urgencyEl = document.getElementById("urgency");
+  const intentionEl = document.getElementById("intention");
+  if (sentimentEl) sentimentEl.textContent = sentiment ?? "—";
+  if (urgencyEl) urgencyEl.textContent = urgency ?? "—";
+  if (intentionEl) intentionEl.textContent = intention ?? "—";
   if (urgencyIndicator) {
-    urgencyIndicator.classList.remove("urgency-high", "urgency-medium", "urgency-low", "unknown"); // Reset state
-    const processedUrgency = String(urgency || "").trim().toLowerCase();
+    urgencyIndicator.classList.remove("urgency-high","urgency-medium","urgency-low","unknown");
+    const p = String(urgency || "").trim().toLowerCase();
+    if (p.includes("high")) urgencyIndicator.classList.add("urgency-high");
+    else if (p.includes("medium")) urgencyIndicator.classList.add("urgency-medium");
+    else if (p.includes("low")) urgencyIndicator.classList.add("urgency-low");
+    else urgencyIndicator.classList.add("unknown");
+  }
+}
+if (typeof window !== "undefined") window.setMetaData = setMetaDataLocal;
 
-    if (processedUrgency.includes("high")) {
-      urgencyIndicator.classList.add("urgency-high");
-    } else if (processedUrgency.includes("medium")) {
-      urgencyIndicator.classList.add("urgency-medium");
-    } else if (processedUrgency.includes("low")) {
-      urgencyIndicator.classList.add("urgency-low");
-    } else {
-      urgencyIndicator.classList.add("unknown");
+/* ============================
+   Theme helper
+   ============================ */
+
+/**
+ * Apply Office theme variables to :root.
+ * @param {Object} theme
+ */
+function applyOfficeThemeVars(theme) {
+  if (!theme) return;
+  const FALLBACKS = { bg:"#ffffff", surface:"#fbfcfd", text:"#111827", border:"#e6e9ee", muted:"#6b7280" };
+  function readCssVar(name) {
+    try { if (typeof window !== "undefined" && window.getComputedStyle) { const comp = window.getComputedStyle(document.documentElement); const val = comp.getPropertyValue(name); if (val) return val.trim(); } } catch (e) { /* ignore read error */ } // Fixed: Empty block statement
+    try { const inline = document.documentElement.style.getPropertyValue(name); if (inline) return inline.trim(); } catch (e) { /* ignore read error */ } // Fixed: Empty block statement
+    const key = name.replace(/^--/,"");
+    return FALLBACKS[key] || "";
+  }
+  const bg = readCssVar("--bg") || FALLBACKS.bg;
+  const txt = readCssVar("--text") || FALLBACKS.text;
+  const bodyBg = theme.bodyBackgroundColor && String(theme.bodyBackgroundColor).trim() ? theme.bodyBackgroundColor : bg;
+  const bodyFg = theme.bodyForegroundColor && String(theme.bodyForegroundColor).trim() ? theme.bodyForegroundColor : txt;
+  try {
+    document.documentElement.style.setProperty("--bg", bodyBg);
+    document.documentElement.style.setProperty("--surface", bodyBg);
+    document.documentElement.style.setProperty("--text", bodyFg);
+    if (theme.bodyBorderColor) document.documentElement.style.setProperty("--border", theme.bodyBorderColor);
+    if (theme.bodySubtleColor) document.documentElement.style.setProperty("--muted", theme.bodySubtleColor);
+  } catch (e) { console.warn("applyOfficeThemeVars failed", e); }
+}
+
+/* ============================
+   Compose backup and setter
+   ============================ */
+
+/**
+ * Save a backup of the current compose HTML body.
+ * @returns {Promise<void>}
+ */
+composeBackupStore.saveBackup = async function() {
+  try {
+    const item = Office?.context?.mailbox?.item;
+    if (!item || typeof item.body?.getAsync !== "function") return;
+    const html = await new Promise((resolve) => {
+      item.body.getAsync(Office.CoercionType.Html, (res) => {
+        if (res.status === Office.AsyncResultStatus.Succeeded) resolve(res.value || "");
+        else resolve("");
+      });
+    });
+    this.lastBackup = html;
+    log("Saved compose backup.");
+  } catch (e) { console.warn("saveBackup failed", e); }
+};
+
+/**
+ * Restore the last saved compose backup.
+ * @returns {Promise<boolean>}
+ */
+composeBackupStore.restoreBackup = async function() {
+  if (!this.lastBackup) return false;
+  try {
+    await applyComposeHtml(this.lastBackup, { createBackup: false });
+    this.lastBackup = null;
+    return true;
+  } catch (e) { console.warn("restoreBackup failed", e); return false; }
+};
+
+/**
+ * Apply HTML into the current compose using setAsync; throws if unavailable.
+ * @param {string} htmlContent
+ * @param {{createBackup:boolean}} [options]
+ * @returns {Promise<void>}
+ */
+async function applyComposeHtml(htmlContent, options = { createBackup: true }) {
+  const html = sanitizeHtml(String(htmlContent || "<p></p>"));
+  if (options.createBackup) await composeBackupStore.saveBackup();
+  const item = Office?.context?.mailbox?.item;
+  if (item && typeof item.body?.setAsync === "function") {
+    await new Promise((resolve, reject) => {
+      item.body.setAsync(html, { coercionType: Office.CoercionType.Html }, (r) => {
+        if (r.status === Office.AsyncResultStatus.Succeeded) resolve(true);
+        else reject(r.error);
+      });
+    });
+    log("applyComposeHtml: setAsync applied.");
+    return;
+  }
+  throw new Error("setAsync not available");
+}
+
+/**
+ * Read the current compose HTML if present; otherwise return empty string.
+ * @returns {Promise<string>}
+ */
+async function getCurrentComposeHtml() {
+  try {
+    const item = Office?.context?.mailbox?.item;
+    if (!item || typeof item.body?.getAsync !== "function") return "";
+    return await new Promise((resolve) => {
+      item.body.getAsync(Office.CoercionType.Html, (res) => {
+        if (res.status === Office.AsyncResultStatus.Succeeded) resolve(res.value || "");
+        else resolve("");
+      });
+    });
+  } catch (e) {
+    log("getCurrentComposeHtml failed: " + (e && e.message));
+    return "";
+  }
+}
+
+/* ============================
+   Fetch helpers
+   ============================ */
+
+/**
+ * Fetch with AbortController timeout.
+ * @param {string} url
+ * @param {RequestInit} [opts]
+ * @param {number} [timeoutMs]
+ * @returns {Promise<Response>}
+ */
+async function fetchWithTimeout(url, opts = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+  const AC = typeof window !== "undefined" && window.AbortController ? new window.AbortController() : null;
+  if (AC) opts.signal = AC.signal;
+  const timerId = typeof window !== "undefined" && window.setTimeout ? window.setTimeout(() => AC && AC.abort(), timeoutMs) : null;
+  try {
+    const res = await fetch(url, opts);
+    if (typeof window !== "undefined" && window.clearTimeout && timerId) window.clearTimeout(timerId);
+    return res;
+  } catch (e) {
+    if (typeof window !== "undefined" && window.clearTimeout && timerId) window.clearTimeout(timerId);
+    throw e;
+  }
+}
+
+/**
+ * Whether an HTTP status should be retried.
+ * @param {number} status
+ * @returns {boolean}
+ */
+function isRetriableStatus(status) {
+  return status === 429 || (status >= 500 && status < 600);
+}
+
+/* ============================
+   Robust JSON-in-text + tool_code extraction
+   ============================ */
+
+/**
+ * Try to parse JSON embedded in text (fenced or raw) and handle wrapped tool_code/print(...) cases.
+ * Returns parsed object or null.
+ * @param {string} text
+ * @returns {any|null}
+ */
+function tryParseJsonFromText(text) {
+  if (!text || typeof text !== "string") return null;
+
+  // Helper to normalize parsed objects into expected shape
+  function normalizeParsed(parsed) {
+    if (!parsed || typeof parsed !== "object") return parsed;
+    const args = parsed.args || parsed.arguments || parsed.params || {};
+    const html =
+      args.htmlContent ||
+      args.html ||
+      args.html_content ||
+      args.newHtmlContent ||
+      args.new_html_content ||
+      args.html_body ||
+      args.body ||
+      parsed.htmlContent ||
+      parsed.html ||
+      parsed.body;
+    if (html) {
+      return { function: parsed.function || parsed.functionName || parsed.name || "setDraftBody", args: { htmlContent: html }, explanation: parsed.explanation || parsed.note || "" };
+    }
+    if (parsed.function && parsed.args) return parsed;
+    return parsed;
+  }
+
+  // 1) Direct JSON that includes a tool_code wrapper
+  try {
+    const t = text.trim();
+    if (t.startsWith("{") && t.includes('"tool_code"')) {
+      const parsed = JSON.parse(t);
+      if (parsed && typeof parsed.tool_code === "string") {
+        const extracted = extractHtmlFromToolCode(parsed.tool_code);
+        if (extracted) return { function: "setDraftBody", args: { htmlContent: extracted }, explanation: parsed.explanation || parsed.note || "" };
+      }
+      const norm = normalizeParsed(parsed);
+      if (norm) return norm;
+    }
+  } catch (e) {
+    /* continue to looser parsing */ // Fixed: 'e' is defined but never used
+  }
+
+  // 2) Remove fenced blocks if present
+  let s = text.trim();
+  if (s.startsWith("```") && s.includes("```")) {
+    s = s.replace(/^```[\s\S]*?\n/, "").replace(/\n?```$/, "").trim();
+  }
+
+  // 3) Try to extract a JSON object substring and normalize common arg names
+  const firstBrace = s.indexOf("{");
+  const lastBrace = s.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    const candidate = s.slice(firstBrace, lastBrace + 1);
+    try {
+      const parsed = JSON.parse(candidate);
+      if (parsed) {
+        if (parsed.tool_code && typeof parsed.tool_code === "string") {
+          const extracted = extractHtmlFromToolCode(parsed.tool_code);
+          if (extracted) return { function: "setDraftBody", args: { htmlContent: extracted }, explanation: parsed.explanation || parsed.note || "" };
+        }
+        const norm = normalizeParsed(parsed);
+        if (norm) return norm;
+        return parsed;
+      }
+    } catch (e) {
+      // not valid JSON substring
     }
   }
-  return;
+
+  // 4) Look for single-line JSON after ```json fences
+  const jsonBlockMatch = text.match(/```json\s*([\s\S]*?)\s*```/i);
+  if (jsonBlockMatch && jsonBlockMatch[1]) {
+    try {
+      const parsed = JSON.parse(jsonBlockMatch[1].trim());
+      const norm = normalizeParsed(parsed);
+      if (norm) return norm;
+      return parsed;
+    } catch (e) { /* ignore parse error */ }
+  }
+
+  // 5) Try to extract HTML or payloads from wrapper forms (print/setDraftBody patterns)
+  const extractedFromWrapper = extractHtmlFromToolCode(s);
+  if (extractedFromWrapper) return { function: "setDraftBody", args: { htmlContent: extractedFromWrapper } };
+
+  // 6) Heuristic: if text contains obvious HTML, return as htmlContent
+  const htmlStart = s.indexOf("<");
+  if (htmlStart !== -1) {
+    const htmlCandidate = s.slice(htmlStart);
+    const endIdx = htmlCandidate.lastIndexOf(">");
+    const snippet = endIdx > 0 ? htmlCandidate.slice(0, endIdx + 1) : htmlCandidate;
+    return { function: "setDraftBody", args: { htmlContent: snippet } };
+  }
+
+  return null;
 }
 
-/* -------------------------
-   API call helpers (retry/backoff)
-   ------------------------- */
+/**
+ * Extract HTML from wrappers like:
+ * - print(setDraftBody(r'''...'''))
+ * - print(setDraftBody(r"""..."""))
+ * - print(setDraftBody(newHtmlContent='...'))
+ * - print(setDraftBody(html_content="..."))
+ * - print(setDraftBody(body='...')) / setDraftBody("...") / setDraftBody('...')
+ * Returns inner HTML or null.
+ * @param {string} wrapper
+ * @returns {string|null}
+ */
+function extractHtmlFromToolCode(wrapper) {
+  if (!wrapper || typeof wrapper !== "string") return null;
+  const w = wrapper.replace(/\r/g, "").trim();
+
+  // 1) r'''...''' and r"""..."""
+  let m = w.match(/setDraftBody\s*\(\s*r'''([\s\S]*?)'''/i);
+  if (m && m[1]) return m[1];
+
+  m = w.match(/setDraftBody\s*\(\s*r"""([\s\S]*?)"""/i);
+  if (m && m[1]) return m[1];
+
+  // 2) newHtmlContent='...' or newHtmlContent="..."
+  m = w.match(/setDraftBody\s*\(\s*newHtmlContent\s*=\s*'(.*?)'\s*\)/i);
+  if (m && m[1]) return m[1];
+  m = w.match(/setDraftBody\s*\(\s*newHtmlContent\s*=\s*"(.*?)"\s*\)/i);
+  if (m && m[1]) return m[1];
+
+  // 3) html_content='...' or html_content="..."
+  m = w.match(/setDraftBody\s*\(\s*html_content\s*=\s*'(.*?)'\s*\)/i);
+  if (m && m[1]) return m[1];
+  m = w.match(/setDraftBody\s*\(\s*html_content\s*=\s*"(.*?)"\s*\)/i);
+  if (m && m[1]) return m[1];
+
+  // 4) body='...' or body="..."
+  m = w.match(/setDraftBody\s*\(\s*body\s*=\s*'(.*?)'\s*\)/i);
+  if (m && m[1]) return m[1];
+  m = w.match(/setDraftBody\s*\(\s*body\s*=\s*"(.*?)"\s*\)/i);
+  if (m && m[1]) return m[1];
+
+  // 5) html_content= inside wrapper
+  m = w.match(/html_content\s*=\s*'(.*?)'/i);
+  if (m && m[1]) return m[1];
+  m = w.match(/html_content\s*=\s*"(.*?)"/i);
+  if (m && m[1]) return m[1];
+
+  // 6) setDraftBody("...") or setDraftBody('...')
+  m = w.match(/setDraftBody\s*\(\s*(?:["'`])([\s\S]*?)(?:["'`])\s*\)/i);
+  if (m && m[1]) return m[1];
+
+  // 7) Any triple-quoted block anywhere
+  m = w.match(/'''([\s\S]*?)'''/);
+  if (m && m[1]) return m[1];
+  m = w.match(/"""([\s\S]*?)"""/);
+  if (m && m[1]) return m[1];
+
+  // 8) If wrapper contains a JSON-like tool_code string with embedded quoted HTML, try to find html inside quotes
+  m = w.match(/(['"])(<[\s\S]*?>)\1/);
+  if (m && m[2]) return m[2];
+
+  // 9) Fallback: find first "<" and return until last ">"
+  const htmlStart = w.indexOf("<");
+  if (htmlStart !== -1) {
+    const htmlCandidate = w.slice(htmlStart);
+    const endIdx = htmlCandidate.lastIndexOf(">");
+    if (endIdx > 0) return htmlCandidate.slice(0, endIdx + 1);
+    return htmlCandidate;
+  }
+
+  return null;
+}
+
+/* ============================
+   Normalize provider responses
+   ============================ */
 
 /**
- * Calls the custom API to generate a response.
- * Includes a retry mechanism with exponential backoff for rate limit errors.
- * @param {string} userQuery - The user's query to send to the API.
- * @returns {Promise<string>} A promise that resolves with the generated text.
+ * Normalize provider response into {text?, functionCall?}.
+ * Accepts candidate.content.parts, choice.message, groundingMetadata.searchEntryPoint.renderedContent.
+ * @param {any} result
+ * @returns {NormalizedResult|null}
+ */
+function normalizeModelResult(result) {
+  const candidate = result?.candidates?.[0];
+  if (candidate) {
+    if (candidate.functionCall) {
+      let args = candidate.functionCall.arguments || candidate.functionCall.args || candidate.functionCall.argumentsJson;
+      if (typeof args === "string") {
+        try { args = JSON.parse(args); } catch (e) { log("normalizeModelResult: parse failed"); } // Fixed: 'e' is defined but never used
+      }
+      return { functionCall: { name: candidate.functionCall.name, args } };
+    }
+
+    let partText = candidate.content?.parts?.[0]?.text || candidate.content?.parts?.[0]?.content;
+    if (!partText) {
+      partText = candidate.groundingMetadata?.searchEntryPoint?.renderedContent;
+    }
+    if (typeof partText === "string") {
+      const parsed = tryParseJsonFromText(partText);
+      if (parsed && parsed.function) return { functionCall: { name: parsed.function, args: parsed.args || {} } };
+      return { text: partText };
+    }
+  }
+
+  const choice = result?.choices?.[0];
+  if (choice) {
+    const func = choice.message?.function_call || choice.function_call;
+    if (func) {
+      let args = func.arguments || func.argumentsJson || func.args;
+      if (typeof args === "string") {
+        try { args = JSON.parse(args); } catch (e) { log("normalizeModelResult: parse failed"); } // Fixed: 'e' is defined but never used
+      }
+      return { functionCall: { name: func.name, args } };
+    }
+    const text = choice.message?.content?.text || choice.text;
+    if (typeof text === "string") {
+      const parsed = tryParseJsonFromText(text);
+      if (parsed && parsed.function) return { functionCall: { name: parsed.function, args: parsed.args || {} } };
+      return { text };
+    }
+  }
+
+  if (typeof result?.text === "string") {
+    const parsed = tryParseJsonFromText(result.text);
+    if (parsed && parsed.function) return { functionCall: { name: parsed.function, args: parsed.args || {} } };
+    return { text: result.text };
+  }
+
+  return null;
+}
+
+/* ============================
+   Call Gemini / Generative API
+   ============================ */
+
+/**
+ * Call the provider (Google Generative API or proxy).
+ * @returns {Promise<NormalizedResult>}
+ */
+async function callGeminiAPI(userQuery, system_instruction, opts = {}) {
+  const apiKey = getVar("google_api_key");
+  const endpointUrl = getVar("endpoint_url") || "";
+  const proxyUrl = getVar("proxy_gen_endpoint") || DEFAULT_PROXY_ENDPOINT;
+  const apiUrl = endpointUrl && apiKey ? `${endpointUrl}${apiKey}` : proxyUrl;
+
+  const payload = {
+    contents: [{ parts: [{ text: String(userQuery || "") }] }],
+    tools: [{ google_search: {} }],
+    systemInstruction: { parts: [{ text: String(system_instruction || "") }] },
+    ...(opts.apiParams || {})
+  };
+
+  const maxAttempts = Number(opts.maxAttempts || DEFAULT_MAX_ATTEMPTS);
+  const baseDelay = Number(opts.baseDelayMs || 1000);
+  const timeoutMs = Number(opts.timeoutMs || REQUEST_TIMEOUT_MS);
+
+  let attempt = 0;
+  while (attempt < maxAttempts) {
+    attempt++;
+    const AC = typeof window !== "undefined" && window.AbortController ? new window.AbortController() : null;
+    const signal = AC ? AC.signal : undefined;
+    const timerId = AC && typeof window !== "undefined" && window.setTimeout ? window.setTimeout(() => AC.abort(), timeoutMs) : null;
+
+    try {
+      const res = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal
+      });
+
+      if (typeof window !== "undefined" && window.clearTimeout && timerId) window.clearTimeout(timerId);
+      log(`Attempt ${attempt}: API status ${res.status}`);
+
+      if (isRetriableStatus(res.status)) {
+        if (attempt >= maxAttempts) {
+          const txt = await res.text().catch(() => "");
+          throw new Error(`API call failed ${res.status}: ${txt}`);
+        }
+        const delay = baseDelay * Math.pow(2, attempt - 1) + Math.random() * 500;
+        log(`Retriable status ${res.status}, backing off ${Math.round(delay)}ms`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+
+      if (res.status >= 400 && res.status < 500 && !res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`API call failed ${res.status}: ${txt}`);
+      }
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`API call failed ${res.status}: ${txt}`);
+      }
+
+      const result = await res.json();
+      try { log(`API raw response: ${JSON.stringify(result).slice(0, 2000)}`); } catch (e) { /* ignore stringify error */ } // Fixed: Empty block statement
+      if (result && (result.text || result.functionCall)) return result;
+      const normalized = normalizeModelResult(result);
+      if (!normalized) throw new Error("Invalid response format from API.");
+      return normalized;
+    } catch (err) {
+      if (typeof window !== "undefined" && window.clearTimeout && timerId) window.clearTimeout(timerId);
+      if (err && err.name === "AbortError") {
+        log(`Request aborted (likely timeout). Attempt ${attempt} of ${maxAttempts}.`);
+      }
+      const m = err && err.message ? err.message : String(err);
+      log(`Attempt ${attempt}: error: ${m}`);
+      if (attempt >= maxAttempts) throw new Error(`Failed to call Gemini API after ${maxAttempts} attempts: ${m}`);
+      const backoff = baseDelay * Math.pow(2, attempt - 1) + Math.random() * 500;
+      await new Promise(r => setTimeout(r, backoff));
+    }
+  }
+
+  throw new Error("callGeminiAPI exhausted retries.");
+}
+
+/* ============================
+   Legacy custom endpoint
+   ============================ */
+
+/**
+ * Call a legacy custom endpoint that returns preformatted analysis/draft.
+ * @param {any} userQuery
+ * @returns {Promise<any>}
  */
 async function callCustomEndpoint(userQuery) {
   const apiUrl = getVar("customendpoint_url");
   if (!apiUrl) throw new Error("customendpoint_url not configured.");
-  const payload = {
-    query: userQuery,
-  };
-
-  let attempts = 0;
-  const maxAttempts = 5;
-  const baseDelay = 1000;
-
+  const payload = { query: userQuery };
+  let attempts = 0, maxAttempts = 5, baseDelay = 1000;
   while (attempts < maxAttempts) {
     try {
-      log(`Attempting to call custom API. Attempt ${attempts + 1} of ${maxAttempts}.`);
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-      log(`Attempt ${attempts + 1}: API response status is ${response.status}`);
-
-      // Handles rate limiting with exponential backoff
-      if (response.status === 429) {
-        const delay = baseDelay * Math.pow(2, attempts) + Math.random() * 1000;
-        attempts++;
-        log(`Rate limit exceeded. Retrying in ${delay}ms.`);
-        await new Promise((res) => setTimeout(res, delay));
+      attempts++;
+      const res = await fetchWithTimeout(apiUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }, REQUEST_TIMEOUT_MS);
+      log(`Attempt ${attempts}: custom endpoint ${res.status}`);
+      if (isRetriableStatus(res.status)) {
+        const delay = baseDelay * Math.pow(2, attempts - 1) + Math.random() * 1000;
+        await new Promise(r => setTimeout(r, delay));
         continue;
       }
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API call failed with status ${response.status}: ${errorText}`);
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`API call failed ${res.status}: ${txt}`);
       }
-
-      const result = await response.json();
-      // Checks for a valid response format and returns the generated text
-      if (result) {
-        log("API call successful.");
-        return result;
-      } else {
-        throw new Error("Invalid response format from API.");
-      }
-    } catch (error) {
-      attempts++;
-      log(`Attempt ${attempts}: an error occurred. ${error.message}`);
-      if (attempts >= maxAttempts) {
-        throw new Error(`Failed to call custom API after ${maxAttempts} attempts.`);
-      }
+      const result = await res.json();
+      if (!result) throw new Error("Invalid response format from custom endpoint.");
+      return result;
+    } catch (err) {
+      log(`Attempt ${attempts}: custom endpoint error: ${err && err.message}`);
+      if (attempts >= maxAttempts) throw err;
     }
   }
 }
 
-/**
- * Calls the Gemini API to generate a response.
- * Includes a retry mechanism with exponential backoff for rate limit errors.
- * @param {string} userQuery - The user's query to send to the API.
- * @param {string} system_instruction - The system instruction for the API.
- * @returns {Promise<string>} A promise that resolves with the generated text.
- */
-async function callGeminiAPI(userQuery, system_instruction) {
-  const apiKey = getVar("google_api_key"); // Replace with your actual API key or use a secure method to store it
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not set in environment variables.");
-  }
-  const apiUrl = `${getVar("endpoint_url")}${apiKey}`;
-  const payload = {
-    contents: [
-      {
-        parts: [
-          {
-            text: userQuery,
-          },
-        ],
-      },
-    ],
-    tools: [
-      {
-        google_search: {},
-      },
-    ],
-    systemInstruction: {
-      parts: [
-        {
-          text: system_instruction,
-        },
-      ],
-    },
-  };
-
-  let attempts = 0;
-  const maxAttempts = 5;
-  const baseDelay = 1000;
-
-  while (attempts < maxAttempts) {
-    try {
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-      log(`Attempt ${attempts + 1}: API response status is ${response.status}`);
-
-      // Handles rate limiting with exponential backoff
-      if (response.status === 429) {
-        const delay = baseDelay * Math.pow(2, attempts) + Math.random() * 1000;
-        attempts++;
-        log(`Rate limit exceeded. Retrying in ${delay}ms.`);
-        await new Promise((res) => setTimeout(res, delay));
-        continue;
-      }
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API call failed with status ${response.status}: ${errorText}`);
-      }
-
-      const result = await response.json();
-      const candidate = result.candidates?.[0];
-
-      // Checks for a valid response format and returns the generated text
-      if (candidate && candidate.content?.parts?.[0]?.text) {
-        log("API call successful.");
-        return candidate.content.parts[0].text;
-      } else {
-        throw new Error("Invalid response format from API.");
-      }
-    } catch (error) {
-      attempts++;
-      log(`Attempt ${attempts}: an error occurred. ${error.message}`);
-      if (attempts >= maxAttempts) {
-        throw new Error(`Failed to call Gemini API after ${maxAttempts} attempts.`);
-      }
-    }
-  }
-}
-
-/* -------------------------
-   Email helpers
-   ------------------------- */
+/* ============================
+   Email helpers and compose fallback
+   ============================ */
 
 /**
- * Retrieves the email body text for the provided item.
- * @param {Office.Item} item - The mailbox item.
- * @returns {Promise<string>} The plain text body content.
+ * Get email body text for the given item.
+ * @param {Office.Item} item
+ * @returns {Promise<string>}
  */
 async function getEmailBody(item) {
   return new Promise((resolve, reject) => {
     if (item.body?.getAsync) {
-      item.body.getAsync(Office.CoercionType.Text, (asyncResult) => {
-        if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
-          resolve(asyncResult.value);
-        } else {
-          reject(asyncResult.error);
-        }
+      item.body.getAsync(Office.CoercionType.Text, (r) => {
+        if (r.status === Office.AsyncResultStatus.Succeeded) resolve(r.value);
+        else reject(r.error);
       });
-    } else {
-      resolve(""); // Resolve with an empty string if no body exists.
-    }
+    } else resolve("");
   });
 }
 
-/* -------------------------
-   Compose helpers and button wiring
-   ------------------------- */
-
 /**
- * Returns a sensible suggested subject derived from the item subject.
- * @param {Office.Item} item - The mailbox item.
- * @returns {string} The suggested subject line.
+ * Suggest a reply subject derived from item.
+ * @param {Office.Item} item
+ * @returns {string}
  */
 function getSuggestedSubjectFromItem(item) {
   try {
-    const subj = item?.subject?.toString ? item.subject.toString() : (item?.subject || "");
-    return subj ? `Re: ${subj}` : "Reply";
-  } catch {
-    return "Reply";
-  }
+    const s = item?.subject?.toString ? item.subject.toString() : item?.subject || "";
+    return s ? `Re: ${s}` : "Reply";
+  } catch (e) { return "Reply"; } // Fixed: 'e' is defined but never used
 }
 
 /**
- * Opens a compose window using the most appropriate Office.js API available.
- * Tries displayReplyAllForm, displayReplyForm, then displayNewMessageForm as fallback.
- * @param {Office.Item} item - The mailbox item to base the compose on.
- * @param {string} htmlDraft - The HTML content to insert into the compose window.
- * @param {string} fallbackSubject - Optional subject when opening a new message form.
+ * Open compose window populated with provided HTML draft (fallback).
+ * @param {Office.Item} item
+ * @param {string} htmlDraft
+ * @param {string} fallbackSubject
  */
 function openComposeWithHtml(item, htmlDraft, fallbackSubject) {
   const htmlBody = typeof htmlDraft === "string" ? htmlDraft : String(htmlDraft || "<p>—</p>");
   try {
-    // Preferred: open Reply All compose and inject html
     if (typeof item.displayReplyAllForm === "function") {
-      try {
-        item.displayReplyAllForm({ htmlBody: htmlBody });
-        log("Opened Reply All compose with suggested draft.");
-        return;
-      } catch (err) {
-        log("displayReplyAllForm threw: " + (err?.message || err));
-        // fall through to other options
-      }
+      try { item.displayReplyAllForm({ htmlBody }); log("Opened Reply All compose."); return; } catch(e){ log("displayReplyAllForm failed", e); }
     }
-
-    // Older hosts may only support reply (not replyAll)
     if (typeof item.displayReplyForm === "function") {
-      try {
-        item.displayReplyForm({ htmlBody: htmlBody });
-        log("Opened Reply compose with suggested draft.");
-        return;
-      } catch (err) {
-        log("displayReplyForm threw: " + (err?.message || err));
-      }
+      try { item.displayReplyForm({ htmlBody }); log("Opened Reply compose."); return; } catch(e){ log("displayReplyForm failed", e); }
     }
-
-    // Fallback: open a new message form (recipients won't be prefilled unless added)
     if (typeof Office.context.mailbox.displayNewMessageForm === "function") {
-      try {
-        Office.context.mailbox.displayNewMessageForm({
-          htmlBody: htmlBody,
-          subject: fallbackSubject || getSuggestedSubjectFromItem(item),
-        });
-        log("Opened New Message compose with suggested draft.");
-        return;
-      } catch (err) {
-        log("displayNewMessageForm threw: " + (err?.message || err));
-      }
+      try { Office.context.mailbox.displayNewMessageForm({ htmlBody, subject: fallbackSubject || getSuggestedSubjectFromItem(item) }); log("Opened New Message compose."); return; } catch(e){ log("displayNewMessageForm failed", e); }
     }
-
-    // No supported compose API available
     showError("Unable to open a draft in this Outlook host. Try replying manually.");
-    log("No supported compose APIs available in this host.");
-  } catch (err) {
-    showError("Failed to open draft. See console for details.");
-    console.error("Failed to open draft:", err);
-  }
+  } catch (e) { console.error("openComposeWithHtml error", e); }
 }
 
+/* ============================
+   Helper: apply assistant HTML from text
+   ============================ */
+
 /**
- * Handles the user's chat query, calls the Gemini API, and updates the chat.
+ * Parse assistant text for a fenced HTML block or embedded HTML and apply it to compose.
+ * Returns true when applied (setAsync or fallback opened compose), false otherwise.
+ * @param {string} assistantText
+ * @param {Office.Item} item
+ * @returns {Promise<boolean>}
+ */
+async function applyAssistantHtmlFromText(assistantText, item) {
+  if (!assistantText || typeof assistantText !== "string") return false;
+
+  // 1) Look for a fenced html block first: ```html ... ```
+  const fencedMatch = assistantText.match(/```html\s*([\s\S]*?)\s*```/i);
+  if (fencedMatch && fencedMatch[1]) {
+    const html = fencedMatch[1].trim();
+    try {
+      await applyComposeHtml(html, { createBackup: true });
+      return true;
+    } catch (e) {
+      const cleaned = sanitizeHtml(html);
+      try { openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item)); return true; } catch (openErr) { return false; } // Fixed: Empty block statement and unused var
+    }
+  }
+
+  // 2) Look for any triple-quoted HTML payload r'''...''' or r"""..."""
+  let m = assistantText.match(/r'''([\s\S]*?)'''/i) || assistantText.match(/r"""([\s\S]*?)"""/i);
+  if (m && m[1]) {
+    const html = m[1].trim();
+    try {
+      await applyComposeHtml(html, { createBackup: true });
+      return true;
+    } catch (e) {
+      const cleaned = sanitizeHtml(html);
+      try { openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item)); return true; } catch (openErr) { return false; } // Fixed: Empty block statement and unused var
+    }
+  }
+
+  // 3) Look for "body='...'" or html_content='...' or newHtmlContent='...' inside the assistant output
+  m = assistantText.match(/(?:body|html_content|newHtmlContent)\s*=\s*'(.*?)'/i) || assistantText.match(/(?:body|html_content|newHtmlContent)\s*=\s*"(.*?)"/i);
+  if (m && m[1]) {
+    const html = m[1].trim();
+    try {
+      await applyComposeHtml(html, { createBackup: true });
+      return true;
+    } catch (e) {
+      const cleaned = sanitizeHtml(html);
+      try { openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item)); return true; } catch (openErr) { return false; } // Fixed: Empty block statement and unused var
+    }
+  }
+
+  // 4) Fallback: if the assistant text contains substantial HTML tags, extract and apply the HTML chunk
+  const idx = assistantText.indexOf("<");
+  if (idx >= 0) {
+    const htmlCandidate = assistantText.slice(idx);
+    const endIdx = htmlCandidate.lastIndexOf(">");
+    const snippet = endIdx > 0 ? htmlCandidate.slice(0, endIdx + 1) : htmlCandidate;
+    if (snippet.length > 40) {
+      try {
+        await applyComposeHtml(snippet, { createBackup: true });
+        return true;
+      } catch (e) {
+        const cleaned = sanitizeHtml(snippet);
+        try { openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item)); return true; } catch (openErr) { return false; } // Fixed: Empty block statement and unused var
+      }
+    }
+  }
+
+  return false;
+}
+
+/* ============================
+   Chat handling with robust fallback
+   ============================ */
+
+// Helper to check for editing intent in the user's query
+const EDITING_INTENT_PATTERN = /(change|edit|modify|rewrite|update|remove|add|summarize|alter)/i;
+let sending = false;
+
+/**
+ * Handle chat send and apply function-calls if returned.
+ * Includes a robust fallback when model refuses to call the tool.
+ * @returns {Promise<void>}
  */
 async function handleChatQuery() {
   const input = document.getElementById("chatInput");
   const sendBtn = document.getElementById("chatSendBtn");
-  const query = input.value.trim();
+  if (!input || !sendBtn) return;
+  const userQuery = input.value.trim();
+  if (!userQuery || sending) return;
 
-  if (!query) return;
-
-  // Disable input/button and show loading
-  input.disabled = true;
+  sending = true;
   sendBtn.disabled = true;
-  input.value = ""; // Clear input immediately
-  appendMessage(query, "user");
-  
-  // Placeholder/Loading message
-  appendMessage("Thinking...", "ai");
-  const lastAiMessage = document.getElementById("chatHistory").lastChild;
+  input.disabled = true;
+  input.value = "";
+  appendMessage(userQuery, "user");
+  const thinkingEl = appendMessage("Thinking...", "ai");
 
   try {
-    const chatSystemInstruction = getVar("chatSystemPrompt") || "You are a helpful and concise assistant. Answer the user's question directly.";
+    // 1. Context Gathering:
+    const item = Office?.context?.mailbox?.item;
+    const isReadMode = item?.itemType === Office.MailboxEnums.ItemType.Message;
     
-    // Use the existing, reliable callGeminiAPI function
-    const aiResponse = await callGeminiAPI(query, chatSystemInstruction);
+    // FIX: Use the global 'draft' as the single source of truth for the editable content.
+    // Only fetch live content if 'draft' is empty (i.e., the very first chat turn).
+    let editableContent = draft; 
+    
+    if (!editableContent) {
+      editableContent = await getCurrentComposeHtml() || "";
+    }
 
-    // Update the last message with the actual response
-    lastAiMessage.textContent = aiResponse;
+    let contextPrefix = editableContent ? `CURRENT_DRAFT_HTML:\n${editableContent}\n\n` : "";
+
+    // The original email body is included as separate CONTEXT, NEVER as the editable draft.
+    if (isReadMode) {
+        const emailBody = (await getEmailBody(item)).trim();
+        const name = item.from?.displayName || item.from?.emailAddress || "Sender";
+
+        contextPrefix +=
+            `INCOMING_EMAIL_FROM: ${name}\n` +
+            `INCOMING_EMAIL_BODY:\n${emailBody}\n\n`;
+    }
+    
+    // 2. API Call (Injection and Execution)
+    const intentToEdit = EDITING_INTENT_PATTERN.test(userQuery);
+    let specialInstruction = "";
+    
+    if (intentToEdit) {
+        // Strong instruction to suppress conversational text and force tool/draft output
+        specialInstruction = "You have detected an editing request. You MUST respond with a setDraftBody function call or the draft body HTML/JSON wrapped in fences. DO NOT reply with conversational text or apologies. Be concise and execute the task.";
+    }
+
+    const chatSystemInstruction = getVar("chatSystemPrompt") || editSystemInstruction;
+    const combinedQuery = `${contextPrefix}${userQuery}\n\n${specialInstruction}\n\nYou have access to setDraftBody; return JSON when editing.`;
+
+    const raw = await callGeminiAPI(combinedQuery, chatSystemInstruction, { timeoutMs: REQUEST_TIMEOUT_MS });
+    const normalized = raw && (raw.text || raw.functionCall) ? raw : normalizeModelResult(raw);
+    if (!normalized) {
+      if (thinkingEl) thinkingEl.textContent = "Error: unexpected assistant response format.";
+      return;
+    }
+
+    // 3. Handle successful function call (preferred path)
+    if (normalized.functionCall && normalized.functionCall.name === "setDraftBody") {
+      
+      // === CLIENT-SIDE TOOL GUARDRAIL ===
+      if (!intentToEdit) { 
+        log("Ignoring setDraftBody tool call: No editing intent in user query.");
+        delete normalized.functionCall; 
+      } else {
+        // Intent confirmed: proceed with tool execution
+        const args = normalized.functionCall.args || {};
+        const html = args.htmlContent || args.html || args.content || "";
+        if (!html) {
+          if (thinkingEl) thinkingEl.textContent = "Assistant attempted to modify draft but returned no content.";
+        } else {
+          try {
+            await applyComposeHtml(html, { createBackup: true });
+            draft = html; // CRITICAL: Update global draft state
+            if (thinkingEl) thinkingEl.textContent = "Draft updated in compose window.";
+            showUndoToast();
+          } catch (e) {
+            log("applyComposeHtml failed; falling back to openComposeWithHtml: " + (e && e.message));
+            draft = html;
+            const cleaned = sanitizeHtml(html);
+            try {
+              const item = Office?.context?.mailbox?.item;
+              if (item) openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item));
+              if (thinkingEl) thinkingEl.textContent = "Draft created (fallback). Opening compose window...";
+              showUndoToast();
+            } catch (openErr) {
+              log("Fallback openComposeWithHtml failed: " + (openErr && openErr.message));
+              if (thinkingEl) thinkingEl.textContent = "Failed to apply draft. See console.";
+            }
+          }
+        }
+        return; 
+      }
+    }
+
+    // 4. Robust Fallback: Model returned text (or tool call was ignored)
+    let textFallback = extractModelText(normalized) || ""; // Changed 'const' to 'let'
+    if (textFallback) {
+        
+      if (intentToEdit) {
+          
+          // FIX: Check for the conversational refusal *and* extract the following draft.
+          // This handles cases like: "I am unable to modify the draft... however, here is the reply:\n\nHi Jim,..."
+          const refusalPattern = /I (am|am not) able to modify|tool (is|is not) available|I cannot modify|here is the (draft|reply|suggestion)[:\s]*/i;
+          const refusalMatch = textFallback.match(refusalPattern);
+          if (refusalMatch) {
+              // Extract the content *after* the refusal/explanation
+              const postRefusalContent = textFallback.substring(refusalMatch.index + refusalMatch[0].length).trim();
+              if (postRefusalContent.length > 50) {
+                  // Prioritize the post-refusal content as the true draft
+                  textFallback = postRefusalContent;
+                  log("Overrode textFallback with content found after conversational refusal.");
+              }
+          }
+          // End of FIX
+          
+          // Attempt 1: Check for embedded JSON
+          const parsed = tryParseJsonFromText(textFallback);
+          if (parsed && parsed.function === "setDraftBody" && parsed.args?.htmlContent) {
+            const html = parsed.args.htmlContent;
+            try {
+              await applyComposeHtml(html, { createBackup: true });
+              draft = html; // CRITICAL: Update global draft state
+              showUndoToast();
+              if (thinkingEl) thinkingEl.textContent = parsed.explanation || "Draft updated via fallback (embedded JSON).";
+            } catch (e) {
+              draft = html;
+              const cleaned = sanitizeHtml(html);
+              const item2 = Office?.context?.mailbox?.item;
+              if (item2) openComposeWithHtml(item2, cleaned, getSuggestedSubjectFromItem(item2));
+              showUndoToast();
+              if (thinkingEl) thinkingEl.textContent = "Draft created (fallback, embedded JSON).";
+            }
+            return;
+          }
+          
+          // Attempt 2: Try to apply any embedded HTML
+          const applied = await applyAssistantHtmlFromText(textFallback, item);
+          if (applied) {
+            if (thinkingEl) thinkingEl.textContent = "Applied assistant's suggested draft (embedded HTML).";
+            // FIX: Use getCurrentComposeHtml to update local draft variable
+            draft = (await getCurrentComposeHtml()) || draft; 
+            return;
+          }
+
+          // Attempt 3: Final heuristic - if the text is long (>50 chars), assume it's a draft and try to apply it
+          if (textFallback.length > 50) {
+            const cleanedHtml = sanitizeHtml(removeHtmlFences(textFallback));
+            try {
+              await applyComposeHtml(cleanedHtml, { createBackup: true });
+              draft = cleanedHtml; // CRITICAL: Update global draft state
+              showUndoToast();
+              if (thinkingEl) thinkingEl.textContent = "Applied assistant's suggested draft (long text).";
+            } catch (e) {
+              const item3 = Office?.context?.mailbox?.item;
+              if (item3) openComposeWithHtml(item3, cleanedHtml, getSuggestedSubjectFromItem(item3));
+              draft = cleanedHtml;
+              showUndoToast();
+              if (thinkingEl) thinkingEl.textContent = "Opened compose with assistant's suggestion (long text fallback).";
+            }
+            return;
+          }
+      }
+
+      // 5. Default Chat Reply
+      const replyText = extractModelText(normalized) || "I couldn't generate a response.";
+      if (thinkingEl) thinkingEl.textContent = replyText;
+    }
+
   } catch (err) {
-    lastAiMessage.textContent = "Error: Could not connect to the assistant.";
+    const history = document.getElementById("chatHistory");
+    if (history?.lastChild) history.lastChild.textContent = "Error: Could not connect to the assistant.";
     console.error("Chat API error:", err);
   } finally {
-    // Re-enable input/button
-    input.disabled = false;
+    sending = false;
     sendBtn.disabled = false;
+    input.disabled = false;
     input.focus();
-    document.getElementById("chatHistory").scrollTop = document.getElementById("chatHistory").scrollHeight;
+    const history = document.getElementById("chatHistory");
+    if (history) history.scrollTop = history.scrollHeight;
   }
 }
 
-/* -------------------------
-   DOM wiring for buttons (Quick Reply & Info Button)
-   ------------------------- */
+/* ============================
+   Fail-safe chat UI bootstrap
+   ============================ */
+
+(function ensureChatUiExistsAndWireSafely() {
+  try {
+    if (!document.getElementById("chatContent")) {
+      const container = document.createElement("div");
+      container.id = "chatContent";
+      container.className = "chat-content hidden";
+      container.innerHTML = '<div id="chatHistory" class="chat-history"></div><div class="chat-input-area"><input type="text" id="chatInput" placeholder="Ask a question..." aria-label="Chat input"><button id="chatSendBtn" class="primary">Send</button></div>';
+      const chatbotCard = document.querySelector(".chatbot-card") || document.body;
+      chatbotCard.appendChild(container);
+      log("Fail-safe created minimal #chatContent");
+    } else {
+      const cc = document.getElementById("chatContent");
+      if (!document.getElementById("chatHistory")) { const h = document.createElement("div"); h.id="chatHistory"; h.className="chat-history"; cc.insertBefore(h, cc.firstChild); }
+      if (!document.getElementById("chatInput")) { const i = document.createElement("input"); i.type="text"; i.id="chatInput"; i.placeholder="Ask a question..."; cc.appendChild(i); }
+      if (!document.getElementById("chatSendBtn")) { const b = document.createElement("button"); b.id="chatSendBtn"; b.className="primary"; b.textContent="Send"; cc.appendChild(b); }
+    }
+    const header = document.querySelector(".chat-header");
+    const toggleBtn = document.getElementById("toggleChatBtn");
+    const chatContent = document.getElementById("chatContent");
+    if (header && toggleBtn && chatContent) {
+      header.setAttribute("role","button"); header.tabIndex = 0;
+      header.addEventListener("click", () => {
+        const nowHidden = chatContent.classList.toggle("hidden");
+        toggleBtn.setAttribute("aria-expanded", String(!nowHidden));
+        if (!nowHidden) document.getElementById("chatInput")?.focus();
+      });
+      header.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); header.click(); } });
+      toggleBtn.addEventListener("click", () => header.click());
+    }
+    const sendBtn = document.getElementById("chatSendBtn");
+    if (sendBtn) { sendBtn.removeEventListener("click", handleChatQuery); sendBtn.addEventListener("click", handleChatQuery); }
+    const input = document.getElementById("chatInput");
+    if (input) input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleChatQuery(); } });
+  } catch (e) { console.warn("Fail-safe bootstrap failed", e); } // Fixed: 'e' is defined but never used
+})();
+
+/* ============================
+   DOMContent loaded wiring
+   ============================ */
 
 document.addEventListener("DOMContentLoaded", () => {
-  registerThemeChangeHandler();
-  // Ensure Quick Reply button exists and will be enabled by onReady flow
-  const btnQuickReply = document.getElementById("btnQuickReply");
-  if (btnQuickReply) {
-    // The onReady flow will attach the real behavior; keep safe guard here
-    btnQuickReply.disabled = true;
-  }
-
-  // Info button wiring for help link (THIS WAS THE PREVIOUS FIX FOR THE INFO BUTTON)
+  try { registerThemeChangeHandler(); } catch (e) { /* ignore error */ } // Fixed: Empty block statement and unused var
+  const btnQuickReply = document.getElementById("btnQuickReply"); if (btnQuickReply) btnQuickReply.disabled = true;
   const infoBtn = document.querySelector(".infoBtn");
-  if (infoBtn) {
-    infoBtn.addEventListener("click", () => {
-      try {
-        // Assumes 'helpUrl' is configured in config.json
-        const helpUrl = getVar("helpUrl");
-        if (helpUrl) {
-          window.open(helpUrl, "_blank");
-          log(`Opened help link: ${helpUrl}`);
-        } else {
-            const infoWindow = window.open("", "Info", "width=400,height=250,menubar=no,toolbar=no,location=no");
-            if (infoWindow) {
-              infoWindow.document.write(
-                "<html><head><title>About CommsAssist</title></head><body style='font-family:sans-serif;padding:1em;'>" +
-                "<h2>CommsAssist</h2>" +
-                "<p>Hello! I am your AI assistant for managing email communications.<br>" +
-                "I can help you analyze the sentiment, intention, and urgency of incoming emails, " +
-                "and even draft responses for you.<br><br>" +
-                "Please select an email to get us started!</p>" +
-                "</body></html>"
-              );
-              infoWindow.document.close();
-            }
-        }
-      } catch (err) {
-        console.error("Failed to open help link:", err);
-        showError("Failed to open help link.");
-      }
-    });
-  }
-
-  const toggleBtn = document.getElementById("toggleChatBtn");
-  const chatContent = document.getElementById("chatContent");
-  const chatSendBtn = document.getElementById("chatSendBtn");
-  const chatInput = document.getElementById("chatInput");
-
-  if (toggleBtn && chatContent) {
-    // Event handler for the entire header to be a click target
-    document.querySelector('.chat-header').addEventListener("click", () => {
-      const isExpanded = chatContent.classList.toggle("hidden");
-      toggleBtn.setAttribute("aria-expanded", !isExpanded);
-    });
-  }
-
-  if (chatSendBtn) {
-    chatSendBtn.addEventListener("click", handleChatQuery);
-  }
-
-  if (chatInput) {
-    chatInput.addEventListener("keypress", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault(); // Prevent accidental form submission
-        handleChatQuery();
-      }
-    });
-  }
+  if (infoBtn) infoBtn.addEventListener("click", () => { try { const helpUrl = getVar("helpUrl"); if (helpUrl) window.open(helpUrl, "_blank", "noopener,noreferrer"); else { const w = window.open("", "Info", "width=400,height=250"); if (w) { w.document.write("<!doctype html><html><body style='font-family:system-ui;padding:1em;'><h2>CommsAssist</h2><p>Select an email to start.</p></body></html>"); w.document.close(); } } } catch (e) { console.error("Failed to open help", e); showError("Failed to open help link."); } });
+  document.getElementById("chatSendBtn")?.addEventListener("click", handleChatQuery);
 });
 
-/* -------------------------
-   Main Office onReady flow
-   ------------------------- */
+/* ============================
+   Office onReady main flow
+   ============================ */
 
 /**
- * The main entry point for the Office Add-in.
- * This function runs when the Office document is ready.
+ * Main entry for the Office Add-in.
+ * @param {Office.OnReadyInfo} info
  */
 Office.onReady(async (info) => {
-  log("Office.js is ready.");
-  const configUrl = "config/config.json";
+  log("Office.js ready");
+  try { await loadConfig("config/config.json"); log("Config loaded"); } catch (e) { console.warn("Config load failed", e); }
+  if (info) log(`Host: ${info.host}, Platform: ${info.platform}`);
+  try { const theme = Office.context.officeTheme; if (theme) applyOfficeThemeVars(theme); } catch (e) { /* ignore theme apply error */ } // Fixed: Empty block statement and unused var
 
-  // Load the config file from the specified URL
-  try {
-    await loadConfig(configUrl);
-    log("Configuration loaded successfully.");
-  } catch (error) {
-    console.error(`Failed to load configuration: ${error.message}`);
-    log(`Failed to load configuration: ${error.message}`);
-  }
-
-  if (info) {
-    log(`Add-in is running in ${info.host} on ${info.platform}.`);
-  }
-
-    // Set initial theme
-  const theme = Office.context.officeTheme;
-  if (theme) {
-    applyOfficeThemeVars(theme);
-  }
-  
   const item = Office.context?.mailbox?.item;
-
-  const helpdeskPrompt = getVar("helpdeskPrompt");
   const sentimentPrompt = getVar("sentimentPrompt");
   const urgencyPrompt = getVar("urgencyPrompt");
   const intentionPrompt = getVar("intentionPrompt");
   const customEndpointUrl = getVar("customendpoint_url");
 
   if (!item) {
-    log("No mail item found. Add-in may be running in an unsupported context.");
-    // Hides the main content and disables buttons
-    document.getElementById("sentimentContent").classList.add("hidden");
-    const quickBtn = document.getElementById("btnQuickReply");
-    if (quickBtn) quickBtn.disabled = true;
-    // Displays a message to the user
+    log("No mail item present");
+    document.getElementById("sentimentContent")?.classList.add("hidden");
+    document.getElementById("btnQuickReply")?.setAttribute("disabled","true");
     const rc = document.getElementById("responseContainer");
     if (rc) rc.textContent = "This add-in only works with email messages.";
-    return; // Stop execution if no item is available
+    return;
   }
 
-  log(`Item type: ${item.itemType}`);
-
-  // Checks the mode (Read or Compose) of the mail item
   const isReadMode = item.itemType === Office.MailboxEnums.ItemType.Message;
   const isComposeMode = item.itemType === Office.MailboxEnums.ItemType.MessageCompose;
 
   if (isReadMode) {
-    log("In READ mode.");
-    // Shows the read mode UI and enables the Quick Reply button
-    document.getElementById("sentimentContent").classList.remove("hidden");
-    const quickBtn = document.getElementById("btnQuickReply");
-    if (quickBtn) quickBtn.disabled = false;
-
-    // Wait for the email body to be retrieved first
+    log("READ mode");
+    document.getElementById("sentimentContent")?.classList.remove("hidden");
+    const quickBtn = document.getElementById("btnQuickReply"); if (quickBtn) quickBtn.disabled = false;
     const emailBody = (await getEmailBody(item)).trim();
-
-    // Now that the 'preview' element is populated, proceed.
-    const rc = document.getElementById("responseContainer");
-    if (rc) rc.innerHTML = "Analyzing email content, please wait...";
-
-    let name = "";
-    if (item.from) {
-      name = item.from.displayName || item.from.emailAddress || "";
-    }
+    const rc = document.getElementById("responseContainer"); if (rc) rc.innerHTML = "Analyzing email content, please wait...";
+    let name = ""; if (item.from) name = item.from.displayName || item.from.emailAddress || "";
 
     try {
       if (customEndpointUrl !== "") {
-        // Retrieves additional email metadata asynchronously
-        const query = {
-          fromEmailAddress: name,
-          subject: item.subject ? item.subject : "Unknown",
-          body: emailBody,
-        };
-        const responseData = await callCustomEndpoint(query);
-        log(`Call response: ${JSON.stringify(responseData)}`);
-
-        // Safely read expected values with guards
-        let sentiment = responseData?.response?.metadata?.email_sentiment ?? "Unknown";
-        let urgency = responseData?.response?.metadata?.email_urgency ?? "Unknown";
-        let intention = responseData?.response?.metadata?.email_intention ?? "Unknown";
-        draft = removeHtmlFences(responseData?.response?.answer?.email_draft ?? "");
-
-        document.getElementById("responseContainer").innerHTML =
-          "Analysis complete. Please click 'Quick Reply' to generate a draft.";
-        setMetaData(sentiment, urgency, intention);
+        const q = { fromEmailAddress: name, subject: item.subject || "Unknown", body: emailBody };
+        const r = await callCustomEndpoint(q);
+        log(`Custom endpoint response: ${JSON.stringify(r)}`);
+        const sentiment = r?.response?.metadata?.email_sentiment ?? "Unknown";
+        const urgency = r?.response?.metadata?.email_urgency ?? "Unknown";
+        const intention = r?.response?.metadata?.email_intention ?? "Unknown";
+        draft = removeHtmlFences(r?.response?.answer?.email_draft ?? "");
+        if (rc) rc.innerHTML = "Analysis complete. Click Quick Reply to generate a draft.";
+        if (typeof window !== "undefined" && typeof window.setMetaData === "function") window.setMetaData(sentiment, urgency, intention);
+        else setMetaDataLocal(sentiment, urgency, intention);
       } else {
-        // No custom endpoint: call Gemini for metadata
-        let sentiment = "Unknown";
-        let urgency = "Unknown";
-        let intention = "Unknown";
-
-        // Calls the Gemini API to analyze sentiment
+        let sentiment = "Unknown", urgency = "Unknown", intention = "Unknown";
         try {
           const prompt = `From: ${name}\nBody: ${emailBody}`;
-          sentiment = await callGeminiAPI(prompt, sentimentPrompt);
-          log(`Sentiment analysis result: ${sentiment}`);
-        } catch (err) {
-          log(`Error analyzing sentiment: ${err.message}`);
-        }
-        // Calls the Gemini API to analyze urgency
+          const raw = await callGeminiAPI(prompt, sentimentPrompt, { timeoutMs: REQUEST_TIMEOUT_MS });
+          sentiment = extractModelText(raw) || "Unknown"; log(`Sentiment: ${sentiment}`);
+        } catch (e) { log("Sentiment analysis failed: " + (e && e.message)); }
         try {
           const prompt = `From: ${name}\nBody: ${emailBody}`;
-          urgency = await callGeminiAPI(prompt, urgencyPrompt);
-          log(`Urgency analysis result: ${urgency}`);
-        } catch (err) {
-          console.error(`Error analyzing urgency: ${err.message}`);
-          log(`Error analyzing urgency: ${err.message}`);
-        }
-        // Calls the Gemini API to analyze intention
+          const raw = await callGeminiAPI(prompt, urgencyPrompt, { timeoutMs: REQUEST_TIMEOUT_MS });
+          urgency = extractModelText(raw) || "Unknown"; log(`Urgency: ${urgency}`);
+        } catch (e) { log("Urgency analysis failed: " + (e && e.message)); }
         try {
           const prompt = `From: ${name}\nBody: ${emailBody}`;
-          intention = await callGeminiAPI(prompt, intentionPrompt);
-          log(`Intention analysis result: ${intention}`);
-        } catch (err) {
-          console.error(`Error analyzing intention: ${err.message}`);
-          log(`Error analyzing intention: ${err.message}`);
-        }
-
-        document.getElementById("responseContainer").innerHTML =
-          "Analysis complete. Please click 'Quick Reply' to generate a draft.";
-
-        setMetaData(sentiment, urgency, intention);
+          const raw = await callGeminiAPI(prompt, intentionPrompt, { timeoutMs: REQUEST_TIMEOUT_MS });
+          intention = extractModelText(raw) || "Unknown"; log(`Intention: ${intention}`);
+        } catch (e) { log("Intention analysis failed: " + (e && e.message)); }
+        if (rc) rc.innerHTML = "Analysis complete. Click Quick Reply to generate a draft.";
+        if (typeof window !== "undefined" && typeof window.setMetaData === "function") window.setMetaData(sentiment, urgency, intention);
+        else setMetaDataLocal(sentiment, urgency, intention);
       }
-    } catch (err) {
-      log(`Error calling endpoint: ${err.message}`);
-      console.error(`Error calling endpoint: ${err.message}`);
+    } catch (e) {
+      log("Error calling endpoint: " + (e && e.message));
+      console.error("Error calling endpoint", e);
       showError("Analysis failed. See console for details.");
     }
 
-    // Event listener for the 'Quick Reply' button (generates and immediately opens a reply)
     const quickReplyBtn = document.getElementById("btnQuickReply");
     if (quickReplyBtn) {
       quickReplyBtn.addEventListener("click", async () => {
-        // Disables the button and shows a loading message
         quickReplyBtn.disabled = true;
-        const rc2 = document.getElementById("responseContainer");
-        if (rc2) rc2.innerHTML = "Generating draft...";
-
+        const rc2 = document.getElementById("responseContainer"); if (rc2) rc2.textContent = "Generating draft...";
         try {
+          const currentComposeHtml = await getCurrentComposeHtml();
+          const currentDraftHtml = currentComposeHtml || draft || "";
           if (customEndpointUrl === "") {
-            const prompt = `From: ${name}\nBody: ${emailBody}`;
-            // Calls the Gemini API to generate the draft
-            const generatedText = await callGeminiAPI(prompt, helpdeskPrompt);
-            draft = generatedText;
+            const userRequest = getVar("quickReplyUserInstruction") || "Generate a concise, professional reply based on the message above.";
+            const prompt =
+              `You have access to setDraftBody. CURRENT_DRAFT_HTML:\n${currentDraftHtml}\n\nINCOMING_EMAIL_FROM: ${name}\nINCOMING_EMAIL_BODY:\n${emailBody}\n\nUSER_INSTRUCTION:\n${userRequest}\n\nReturn ONLY the JSON object when editing as described in the system instruction.`;
+
+            const result = await callGeminiAPI(prompt, editSystemInstruction, { timeoutMs: REQUEST_TIMEOUT_MS, allowFunctions: true });
+            const normalized = result && (result.text || result.functionCall) ? result : normalizeModelResult(result);
+
+            if (normalized?.functionCall && normalized.functionCall.name === "setDraftBody") {
+              const html = normalized.functionCall.args?.htmlContent || normalized.functionCall.args?.html || "";
+              if (html) {
+                try {
+                  await applyComposeHtml(html, { createBackup: true });
+                  draft = html;
+                  if (rc2) rc2.textContent = "Draft inserted into compose window.";
+                  showUndoToast();
+                } catch (e) {
+                  log("applyComposeHtml failed in Quick Reply; falling back to openComposeWithHtml: " + (e && e.message));
+                  draft = html;
+                  const cleaned = sanitizeHtml(html);
+                  openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item));
+                  if (rc2) rc2.textContent = "Draft created (fallback). Opening compose window...";
+                  showUndoToast();
+                }
+              } else throw new Error("functionCall returned no html content");
+            } else {
+              const textFallback = extractModelText(normalized) || "";
+              const item = Office?.context?.mailbox?.item;
+              const applied = await applyAssistantHtmlFromText(textFallback, item);
+              if (applied) {
+                if (rc2) rc2.textContent = "Applied assistant's suggested draft.";
+                try { draft = (await getCurrentComposeHtml()) || draft; } catch (e) { /* ignore error */ } // Fixed: Empty block statement and unused var
+              } else {
+                if (textFallback && /unable to modify|cannot modify|not defined|I am unable to modify|I cannot modify/i.test(textFallback)) {
+                  const parsed = tryParseJsonFromText(textFallback);
+                  if (parsed && parsed.function === "setDraftBody" && parsed.args?.htmlContent) {
+                    const html = parsed.args.htmlContent;
+                    try {
+                      await applyComposeHtml(html, { createBackup: true });
+                      draft = html;
+                      if (rc2) rc2.textContent = parsed.explanation || "Draft updated.";
+                      showUndoToast();
+                    } catch (e) {
+                      draft = html;
+                      const cleaned = sanitizeHtml(html);
+                      openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item));
+                      if (rc2) rc2.textContent = "Draft created (fallback). Opening compose window...";
+                      showUndoToast();
+                    }
+                  } else if (textFallback && textFallback.length > 20) {
+                    const cleanedHtml = sanitizeHtml(removeHtmlFences(textFallback));
+                    try {
+                      await applyComposeHtml(cleanedHtml, { createBackup: true });
+                      draft = cleanedHtml;
+                      if (rc2) rc2.textContent = "Applied assistant's suggested draft.";
+                      showUndoToast();
+                    } catch (e) {
+                      openComposeWithHtml(item, cleanedHtml, getSuggestedSubjectFromItem(item));
+                      draft = cleanedHtml;
+                      if (rc2) rc2.textContent = "Opened compose with assistant's suggestion.";
+                      showUndoToast();
+                    }
+                  } else {
+                    if (rc2) rc2.textContent = "Assistant refused to call the tool and returned no usable draft.";
+                  }
+                } else {
+                  const text = extractModelText(normalized) || "";
+                  draft = removeHtmlFences(text);
+                  const cleaned = sanitizeHtml(draft);
+                  openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item));
+                  if (rc2) rc2.textContent = "Draft generated. Opening compose...";
+                }
+              }
+            }
+          } else {
+            const resp = await callCustomEndpoint({ fromEmailAddress: name, subject: item.subject || "Unknown", body: emailBody });
+            draft = removeHtmlFences(resp?.response?.answer?.email_draft || "");
+            const cleaned = sanitizeHtml(draft);
+            openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item));
+            if (rc2) rc2.textContent = "Draft generated. Opening compose...";
           }
         } catch (err) {
           draft = "<html><body><p>Error generating draft. Please try again.</p></body></html>";
-          log(`Error generating draft: ${err.message}`);
-          console.error(`Error generating draft: ${err.message}`);
+          log("Error generating draft: " + (err && err.message));
+          console.error("Error generating draft", err);
+          if (document.getElementById("responseContainer")) document.getElementById("responseContainer").textContent = "Error generating draft. Please try again.";
         } finally {
-          // Re-enables the button and informs user
           quickReplyBtn.disabled = false;
-          if (rc2) rc2.innerHTML = "Draft generated successfully. Opening compose window...";
         }
-
-        // Ensure draft is a string and sanitized for insertion
-        const htmlDraft = typeof draft === "string" ? draft : String(draft || "<p></p>");
-        const cleanedDraft = removeHtmlFences(htmlDraft);
-
-        // Try to open compose with HTML in a robust order
-        openComposeWithHtml(item, cleanedDraft, getSuggestedSubjectFromItem(item));
       });
     }
   } else if (isComposeMode) {
-    log("In COMPOSE mode.");
-    // Hides the main content and disables buttons for compose mode
-    document.getElementById("sentimentContent").classList.add("hidden");
-    const quickBtn = document.getElementById("btnQuickReply");
-    if (quickBtn) quickBtn.disabled = true;
-    const rc = document.getElementById("responseContainer");
-    if (rc) rc.innerHTML = "This functionality is not available in compose mode.";
+    log("COMPOSE mode");
+    document.getElementById("sentimentContent")?.classList.add("hidden");
+    document.getElementById("btnQuickReply")?.setAttribute("disabled","true");
+    const rc = document.getElementById("responseContainer"); if (rc) rc.innerHTML = "This feature is not available in compose mode.";
   } else {
-    log("In an unsupported mode.");
-    // Hides the main content and disables buttons for unsupported modes
-    document.getElementById("sentimentContent").classList.add("hidden");
-    const quickBtn = document.getElementById("btnQuickReply");
-    if (quickBtn) quickBtn.disabled = true;
-    const rc = document.getElementById("responseContainer");
-    if (rc) rc.textContent = "This add-in only works with email messages.";
+    log("Unsupported mode");
+    document.getElementById("sentimentContent")?.classList.add("hidden");
+    document.getElementById("btnQuickReply")?.setAttribute("disabled","true");
+    const rc = document.getElementById("responseContainer"); if (rc) rc.textContent = "This add-in only works with email messages.";
   }
 });
+
+/* ============================
+   Helpers used above
+   ============================ */
+
+/**
+ * Register theme change handler if available.
+ */
+function registerThemeChangeHandler() {
+  try {
+    const mailbox = window.Office?.context?.mailbox;
+    if (!mailbox || !window.Office.EventType?.OfficeThemeChanged) return;
+    mailbox.addHandlerAsync(Office.EventType.OfficeThemeChanged, (eventArgs) => {
+      applyOfficeThemeVars(eventArgs?.officeTheme);
+    }, (result) => {
+      if (result && result.status === Office.AsyncResultStatus.Failed) {
+        console.error("Failed to register theme change handler:", result.error && result.error.message);
+      } else {
+        try { const currentTheme = mailbox.officeTheme; if (currentTheme) applyOfficeThemeVars(currentTheme); } catch (e) { /* ignore error */ } // Fixed: Empty block statement and unused var
+        console.debug("Theme change handler registered.");
+      }
+    });
+  } catch (e) { console.warn("registerThemeChangeHandler not available", e); }
+}
+
+/**
+ * Show undo toast after automatic draft update.
+ */
+function showUndoToast() {
+  let toast = document.getElementById("undoToast");
+  if (!toast) {
+    toast = document.createElement("div"); toast.id = "undoToast"; toast.className = "card";
+    toast.style.position = "fixed"; toast.style.right = "16px"; toast.style.bottom = "16px"; toast.style.zIndex = 9999;
+    const text = document.createElement("div"); text.textContent = "Draft updated. ";
+    const undoBtn = document.createElement("button"); undoBtn.textContent = "Undo"; undoBtn.className = "primary";
+    undoBtn.addEventListener("click", async () => {
+      const ok = await composeBackupStore.restoreBackup();
+      if (ok) showError("Draft restored."); else showError("No backup available.");
+      cleanup();
+    });
+    const cleanup = () => { if (toast && toast.parentNode) toast.parentNode.removeChild(toast); };
+    toast.appendChild(text); toast.appendChild(undoBtn); document.body.appendChild(toast);
+    setTimeout(cleanup, 30000);
+  }
+}
