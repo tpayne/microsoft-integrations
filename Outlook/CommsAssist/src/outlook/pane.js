@@ -3,7 +3,7 @@
  * - Preserves JSDoc.
  * - Robustly handles tool_code wrappers, print/setDraftBody variants, html_content/newHtmlContent/body fields.
  * - Extracts HTML from groundingMetadata.searchEntryPoint.renderedContent when present.
- * - Applies HTML via setAsync when available; falls back to opening compose window.
+ * - Applies HTML via setAsync when available; falls back to opening compose window. (FALLBACK RETAINED)
  * - Includes applyAssistantHtmlFromText helper and uses it in fallback branches.
  *
  * Security: move API keys to a server-side proxy for production and replace sanitizeHtml with DOMPurify.
@@ -57,7 +57,7 @@ const editSystemInstruction =
  * @param {string} msg
  */
 function log(msg) {
-  try { console.log(`[DEBUG] ${msg}`); } catch (e) { /* swallow console error */ } // Fixed: Empty block statement
+  try { console.log(`[DEBUG] ${msg}`); } catch (e) { /* swallow console error */ }
 }
 
 /**
@@ -101,10 +101,10 @@ function showError(msg) {
     rc.textContent = msg;
     rc.classList.add("error");
     rc.setAttribute("role", "alert");
-    try { rc.focus(); } catch (e) { /* focus failed */ } // Fixed: Empty block statement
+    try { rc.focus(); } catch (e) { /* focus failed */ }
   } else {
     // eslint-disable-next-line no-undef
-    alert(msg); // Fixed: 'alert' is not defined (assumes environment has global alert or it is desired to keep this as is)
+    alert(msg);
   }
 }
 
@@ -175,7 +175,7 @@ function extractModelText(res) {
     if (typeof args === "string") return args;
     if (args && typeof args.htmlContent === "string") return args.htmlContent;
     if (args && typeof args.text === "string") return args.text;
-    try { return JSON.stringify(res.functionCall); } catch (e) { /* stringify failed */ return String(res.functionCall); } // Fixed: Empty block statement
+    try { return JSON.stringify(res.functionCall); } catch (e) { /* stringify failed */ return String(res.functionCall); }
   }
   return "";
 }
@@ -200,7 +200,7 @@ function setMetaDataLocal(sentiment, urgency, intention) {
   if (urgencyEl) urgencyEl.textContent = urgency ?? "—";
   if (intentionEl) intentionEl.textContent = intention ?? "—";
   if (urgencyIndicator) {
-    urgencyIndicator.classList.remove("urgency-high","urgency-medium","urgency-low","unknown");
+    urgencyIndicator.classList.remove("urgency-high", "urgency-medium", "urgency-low", "unknown");
     const p = String(urgency || "").trim().toLowerCase();
     if (p.includes("high")) urgencyIndicator.classList.add("urgency-high");
     else if (p.includes("medium")) urgencyIndicator.classList.add("urgency-medium");
@@ -220,11 +220,11 @@ if (typeof window !== "undefined") window.setMetaData = setMetaDataLocal;
  */
 function applyOfficeThemeVars(theme) {
   if (!theme) return;
-  const FALLBACKS = { bg:"#ffffff", surface:"#fbfcfd", text:"#111827", border:"#e6e9ee", muted:"#6b7280" };
+  const FALLBACKS = { bg: "#ffffff", surface: "#fbfcfd", text: "#111827", border: "#e6e9ee", muted: "#6b7280" };
   function readCssVar(name) {
-    try { if (typeof window !== "undefined" && window.getComputedStyle) { const comp = window.getComputedStyle(document.documentElement); const val = comp.getPropertyValue(name); if (val) return val.trim(); } } catch (e) { /* ignore read error */ } // Fixed: Empty block statement
-    try { const inline = document.documentElement.style.getPropertyValue(name); if (inline) return inline.trim(); } catch (e) { /* ignore read error */ } // Fixed: Empty block statement
-    const key = name.replace(/^--/,"");
+    try { if (typeof window !== "undefined" && window.getComputedStyle) { const comp = window.getComputedStyle(document.documentElement); const val = comp.getPropertyValue(name); if (val) return val.trim(); } } catch (e) { /* ignore read error */ }
+    try { const inline = document.documentElement.style.getPropertyValue(name); if (inline) return inline.trim(); } catch (e) { /* ignore read error */ }
+    const key = name.replace(/^--/, "");
     return FALLBACKS[key] || "";
   }
   const bg = readCssVar("--bg") || FALLBACKS.bg;
@@ -401,7 +401,7 @@ function tryParseJsonFromText(text) {
       if (norm) return norm;
     }
   } catch (e) {
-    /* continue to looser parsing */ // Fixed: 'e' is defined but never used
+    /* continue to looser parsing */
   }
 
   // 2) Remove fenced blocks if present
@@ -546,7 +546,7 @@ function normalizeModelResult(result) {
     if (candidate.functionCall) {
       let args = candidate.functionCall.arguments || candidate.functionCall.args || candidate.functionCall.argumentsJson;
       if (typeof args === "string") {
-        try { args = JSON.parse(args); } catch (e) { log("normalizeModelResult: parse failed"); } // Fixed: 'e' is defined but never used
+        try { args = JSON.parse(args); } catch (e) { log("normalizeModelResult: parse failed"); }
       }
       return { functionCall: { name: candidate.functionCall.name, args } };
     }
@@ -568,7 +568,7 @@ function normalizeModelResult(result) {
     if (func) {
       let args = func.arguments || func.argumentsJson || func.args;
       if (typeof args === "string") {
-        try { args = JSON.parse(args); } catch (e) { log("normalizeModelResult: parse failed"); } // Fixed: 'e' is defined but never used
+        try { args = JSON.parse(args); } catch (e) { log("normalizeModelResult: parse failed"); }
       }
       return { functionCall: { name: func.name, args } };
     }
@@ -654,7 +654,7 @@ async function callGeminiAPI(userQuery, system_instruction, opts = {}) {
       }
 
       const result = await res.json();
-      try { log(`API raw response: ${JSON.stringify(result).slice(0, 2000)}`); } catch (e) { /* ignore stringify error */ } // Fixed: Empty block statement
+      try { log(`API raw response: ${JSON.stringify(result).slice(0, 2000)}`); } catch (e) { /* ignore stringify error */ }
       if (result && (result.text || result.functionCall)) return result;
       const normalized = normalizeModelResult(result);
       if (!normalized) throw new Error("Invalid response format from API.");
@@ -714,7 +714,7 @@ async function callCustomEndpoint(userQuery) {
 }
 
 /* ============================
-   Email helpers and compose fallback
+   Email helpers (openComposeWithHtml RETAINED)
    ============================ */
 
 /**
@@ -742,29 +742,119 @@ function getSuggestedSubjectFromItem(item) {
   try {
     const s = item?.subject?.toString ? item.subject.toString() : item?.subject || "";
     return s ? `Re: ${s}` : "Reply";
-  } catch (e) { return "Reply"; } // Fixed: 'e' is defined but never used
+  } catch (e) { return "Reply"; }
 }
 
+/* ============================
+   Email helpers (openComposeWithHtml RETAINED)
+   ============================ */
+
+// ... (other helper functions)
+
 /**
- * Open compose window populated with provided HTML draft (fallback).
- * @param {Office.Item} item
- * @param {string} htmlDraft
- * @param {string} fallbackSubject
+ * Open a new compose window with a draft body.
+ * @param {Office.Item} originalItem - The item to reply to/forward from.
+ * @param {string} htmlBody - The HTML body of the new draft.
+ * @param {string} subject - The subject for the new draft.
+ * @returns {Promise<void>}
  */
-function openComposeWithHtml(item, htmlDraft, fallbackSubject) {
-  const htmlBody = typeof htmlDraft === "string" ? htmlDraft : String(htmlDraft || "<p>—</p>");
-  try {
-    if (typeof item.displayReplyAllForm === "function") {
-      try { item.displayReplyAllForm({ htmlBody }); log("Opened Reply All compose."); return; } catch(e){ log("displayReplyAllForm failed", e); }
+/**
+ * Open a compose window populated with provided HTML.
+ * Tries displayReplyAllForm, then displayReplyForm, then displayNewMessageForm.
+ * Resolves true when a compose window was opened, false when no compose API was available,
+ * and rejects only on unexpected fatal errors.
+ * @param {Office.Item|null|undefined} originalItem
+ * @param {string} htmlBody
+ * @param {string} [subject]
+ * @returns {Promise<boolean>}
+ */
+function openComposeWithHtml(originalItem, htmlBody, subject) {
+  return new Promise((resolve, reject) => {
+    try {
+      const item = originalItem || Office?.context?.mailbox?.item || null;
+      const safeHtml = String(htmlBody || "<p></p>");
+      const safeSubject = subject || (item && typeof item.subject === "string" ? `Re: ${item.subject}` : "Draft");
+
+      // If we have an item and replyAll is supported, prefer replyAll (keeps threading)
+      if (item && typeof item.displayReplyAllForm === "function") {
+        try {
+          item.displayReplyAllForm({ htmlBody: safeHtml }, (asyncResult) => {
+            if (asyncResult && asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+              log("displayReplyAllForm succeeded (compose opened).");
+              return resolve(true);
+            }
+            log("displayReplyAllForm failed: " + (asyncResult?.error?.message || "unknown"));
+            // fall through to next option
+            attemptDisplayNewMessage();
+          });
+          return;
+        } catch (err) {
+          log("displayReplyAllForm threw: " + (err && err.message));
+          // fall through
+        }
+      }
+
+      // If we have an item and reply is supported, try reply
+      if (item && typeof item.displayReplyForm === "function") {
+        try {
+          item.displayReplyForm({ htmlBody: safeHtml }, (asyncResult) => {
+            if (asyncResult && asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+              log("displayReplyForm succeeded (compose opened).");
+              return resolve(true);
+            }
+            log("displayReplyForm failed: " + (asyncResult?.error?.message || "unknown"));
+            attemptDisplayNewMessage();
+          });
+          return;
+        } catch (err) {
+          log("displayReplyForm threw: " + (err && err.message));
+          // fall through
+        }
+      }
+
+      // Try global new message form
+      function attemptDisplayNewMessage() {
+        try {
+          if (typeof Office?.context?.mailbox?.displayNewMessageForm === "function") {
+            Office.context.mailbox.displayNewMessageForm({ htmlBody: safeHtml, subject: safeSubject }, (asyncResult2) => {
+              if (asyncResult2 && asyncResult2.status === Office.AsyncResultStatus.Succeeded) {
+                log("displayNewMessageForm succeeded (compose opened).");
+                return resolve(true);
+              }
+              log("displayNewMessageForm failed: " + (asyncResult2?.error?.message || "unknown"));
+              // final fallback: inject into UI for manual copy
+              return fallbackInject();
+            });
+            return;
+          }
+        } catch (err) {
+          log("displayNewMessageForm threw: " + (err && err.message));
+        }
+        // If displayNewMessageForm not available, fallback
+        fallbackInject();
+      }
+
+      function fallbackInject() {
+        try {
+          const rc = document.getElementById("responseContainer");
+          if (rc) {
+            rc.innerHTML = safeHtml;
+            rc.setAttribute("role", "alert");
+            log("Injected HTML into responseContainer for manual copy.");
+            return resolve(true);
+          }
+        } catch (err) { log("fallbackInject failed: " + (err && err.message)); }
+        log("No compose API available and no UI to inject into.");
+        return resolve(false);
+      }
+
+      // If no item and none of the APIs were available, attempt displayNewMessageForm directly
+      attemptDisplayNewMessage();
+    } catch (err) {
+      log("openComposeWithHtml fatal error: " + (err && err.message));
+      reject(err);
     }
-    if (typeof item.displayReplyForm === "function") {
-      try { item.displayReplyForm({ htmlBody }); log("Opened Reply compose."); return; } catch(e){ log("displayReplyForm failed", e); }
-    }
-    if (typeof Office.context.mailbox.displayNewMessageForm === "function") {
-      try { Office.context.mailbox.displayNewMessageForm({ htmlBody, subject: fallbackSubject || getSuggestedSubjectFromItem(item) }); log("Opened New Message compose."); return; } catch(e){ log("displayNewMessageForm failed", e); }
-    }
-    showError("Unable to open a draft in this Outlook host. Try replying manually.");
-  } catch (e) { console.error("openComposeWithHtml error", e); }
+  });
 }
 
 /* ============================
@@ -773,7 +863,7 @@ function openComposeWithHtml(item, htmlDraft, fallbackSubject) {
 
 /**
  * Parse assistant text for a fenced HTML block or embedded HTML and apply it to compose.
- * Returns true when applied (setAsync or fallback opened compose), false otherwise.
+ * Returns true when applied (setAsync succeeded or new window opened), false otherwise.
  * @param {string} assistantText
  * @param {Office.Item} item
  * @returns {Promise<boolean>}
@@ -789,8 +879,17 @@ async function applyAssistantHtmlFromText(assistantText, item) {
       await applyComposeHtml(html, { createBackup: true });
       return true;
     } catch (e) {
-      const cleaned = sanitizeHtml(html);
-      try { openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item)); return true; } catch (openErr) { return false; } // Fixed: Empty block statement and unused var
+      log("applyAssistantHtmlFromText failed (fenced HTML) via setAsync; falling back to new window: " + (e && e.message));
+      try {
+        const cleaned = sanitizeHtml(html);
+        openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item));
+        draft = html;
+        showUndoToast();
+        return true;
+      } catch (openErr) {
+        log("Fallback openComposeWithHtml failed: " + (openErr && openErr.message));
+        return false;
+      }
     }
   }
 
@@ -802,8 +901,17 @@ async function applyAssistantHtmlFromText(assistantText, item) {
       await applyComposeHtml(html, { createBackup: true });
       return true;
     } catch (e) {
-      const cleaned = sanitizeHtml(html);
-      try { openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item)); return true; } catch (openErr) { return false; } // Fixed: Empty block statement and unused var
+      log("applyAssistantHtmlFromText failed (triple quoted) via setAsync; falling back to new window: " + (e && e.message));
+      try {
+        const cleaned = sanitizeHtml(html);
+        openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item));
+        draft = html;
+        showUndoToast();
+        return true;
+      } catch (openErr) {
+        log("Fallback openComposeWithHtml failed: " + (openErr && openErr.message));
+        return false;
+      }
     }
   }
 
@@ -815,8 +923,17 @@ async function applyAssistantHtmlFromText(assistantText, item) {
       await applyComposeHtml(html, { createBackup: true });
       return true;
     } catch (e) {
-      const cleaned = sanitizeHtml(html);
-      try { openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item)); return true; } catch (openErr) { return false; } // Fixed: Empty block statement and unused var
+      log("applyAssistantHtmlFromText failed (arg match) via setAsync; falling back to new window: " + (e && e.message));
+      try {
+        const cleaned = sanitizeHtml(html);
+        openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item));
+        draft = html;
+        showUndoToast();
+        return true;
+      } catch (openErr) {
+        log("Fallback openComposeWithHtml failed: " + (openErr && openErr.message));
+        return false;
+      }
     }
   }
 
@@ -831,8 +948,17 @@ async function applyAssistantHtmlFromText(assistantText, item) {
         await applyComposeHtml(snippet, { createBackup: true });
         return true;
       } catch (e) {
-        const cleaned = sanitizeHtml(snippet);
-        try { openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item)); return true; } catch (openErr) { return false; } // Fixed: Empty block statement and unused var
+        log("applyAssistantHtmlFromText failed (snippet) via setAsync; falling back to new window: " + (e && e.message));
+        try {
+          const cleaned = sanitizeHtml(snippet);
+          openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item));
+          draft = cleaned;
+          showUndoToast();
+          return true;
+        } catch (openErr) {
+          log("Fallback openComposeWithHtml failed: " + (openErr && openErr.message));
+          return false;
+        }
       }
     }
   }
@@ -931,6 +1057,7 @@ async function handleChatQuery() {
             if (thinkingEl) thinkingEl.textContent = "Draft updated in compose window.";
             showUndoToast();
           } catch (e) {
+            // FALLBACK RETAINED: Open in new compose window if setAsync fails
             log("applyComposeHtml failed; falling back to openComposeWithHtml: " + (e && e.message));
             draft = html;
             const cleaned = sanitizeHtml(html);
@@ -950,25 +1077,21 @@ async function handleChatQuery() {
     }
 
     // 4. Robust Fallback: Model returned text (or tool call was ignored)
-    let textFallback = extractModelText(normalized) || ""; // Changed 'const' to 'let'
+    let textFallback = extractModelText(normalized) || "";
     if (textFallback) {
         
       if (intentToEdit) {
           
-          // FIX: Check for the conversational refusal *and* extract the following draft.
-          // This handles cases like: "I am unable to modify the draft... however, here is the reply:\n\nHi Jim,..."
+          // Check for the conversational refusal *and* extract the following draft.
           const refusalPattern = /I (am|am not) able to modify|tool (is|is not) available|I cannot modify|here is the (draft|reply|suggestion)[:\s]*/i;
           const refusalMatch = textFallback.match(refusalPattern);
           if (refusalMatch) {
-              // Extract the content *after* the refusal/explanation
               const postRefusalContent = textFallback.substring(refusalMatch.index + refusalMatch[0].length).trim();
               if (postRefusalContent.length > 50) {
-                  // Prioritize the post-refusal content as the true draft
                   textFallback = postRefusalContent;
                   log("Overrode textFallback with content found after conversational refusal.");
               }
           }
-          // End of FIX
           
           // Attempt 1: Check for embedded JSON
           const parsed = tryParseJsonFromText(textFallback);
@@ -980,6 +1103,7 @@ async function handleChatQuery() {
               showUndoToast();
               if (thinkingEl) thinkingEl.textContent = parsed.explanation || "Draft updated via fallback (embedded JSON).";
             } catch (e) {
+              // FALLBACK RETAINED: Open in new compose window
               draft = html;
               const cleaned = sanitizeHtml(html);
               const item2 = Office?.context?.mailbox?.item;
@@ -1008,6 +1132,7 @@ async function handleChatQuery() {
               showUndoToast();
               if (thinkingEl) thinkingEl.textContent = "Applied assistant's suggested draft (long text).";
             } catch (e) {
+              // FALLBACK RETAINED: Open in new compose window
               const item3 = Office?.context?.mailbox?.item;
               if (item3) openComposeWithHtml(item3, cleanedHtml, getSuggestedSubjectFromItem(item3));
               draft = cleanedHtml;
@@ -1074,7 +1199,7 @@ async function handleChatQuery() {
     if (sendBtn) { sendBtn.removeEventListener("click", handleChatQuery); sendBtn.addEventListener("click", handleChatQuery); }
     const input = document.getElementById("chatInput");
     if (input) input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleChatQuery(); } });
-  } catch (e) { console.warn("Fail-safe bootstrap failed", e); } // Fixed: 'e' is defined but never used
+  } catch (e) { console.warn("Fail-safe bootstrap failed", e); }
 })();
 
 /* ============================
@@ -1082,7 +1207,7 @@ async function handleChatQuery() {
    ============================ */
 
 document.addEventListener("DOMContentLoaded", () => {
-  try { registerThemeChangeHandler(); } catch (e) { /* ignore error */ } // Fixed: Empty block statement and unused var
+  try { registerThemeChangeHandler(); } catch (e) { /* ignore error */ }
   const btnQuickReply = document.getElementById("btnQuickReply"); if (btnQuickReply) btnQuickReply.disabled = true;
   const infoBtn = document.querySelector(".infoBtn");
   if (infoBtn) infoBtn.addEventListener("click", () => { try { const helpUrl = getVar("helpUrl"); if (helpUrl) window.open(helpUrl, "_blank", "noopener,noreferrer"); else { const w = window.open("", "Info", "width=400,height=250"); if (w) { w.document.write("<!doctype html><html><body style='font-family:system-ui;padding:1em;'><h2>CommsAssist</h2><p>Select an email to start.</p></body></html>"); w.document.close(); } } } catch (e) { console.error("Failed to open help", e); showError("Failed to open help link."); } });
@@ -1101,7 +1226,7 @@ Office.onReady(async (info) => {
   log("Office.js ready");
   try { await loadConfig("config/config.json"); log("Config loaded"); } catch (e) { console.warn("Config load failed", e); }
   if (info) log(`Host: ${info.host}, Platform: ${info.platform}`);
-  try { const theme = Office.context.officeTheme; if (theme) applyOfficeThemeVars(theme); } catch (e) { /* ignore theme apply error */ } // Fixed: Empty block statement and unused var
+  try { const theme = Office.context.officeTheme; if (theme) applyOfficeThemeVars(theme); } catch (e) { /* ignore theme apply error */ }
 
   const item = Office.context?.mailbox?.item;
   const sentimentPrompt = getVar("sentimentPrompt");
@@ -1193,6 +1318,7 @@ Office.onReady(async (info) => {
                   if (rc2) rc2.textContent = "Draft inserted into compose window.";
                   showUndoToast();
                 } catch (e) {
+                  // FALLBACK RETAINED: Open in new compose window
                   log("applyComposeHtml failed in Quick Reply; falling back to openComposeWithHtml: " + (e && e.message));
                   draft = html;
                   const cleaned = sanitizeHtml(html);
@@ -1207,7 +1333,7 @@ Office.onReady(async (info) => {
               const applied = await applyAssistantHtmlFromText(textFallback, item);
               if (applied) {
                 if (rc2) rc2.textContent = "Applied assistant's suggested draft.";
-                try { draft = (await getCurrentComposeHtml()) || draft; } catch (e) { /* ignore error */ } // Fixed: Empty block statement and unused var
+                try { draft = (await getCurrentComposeHtml()) || draft; } catch (e) { /* ignore error */ }
               } else {
                 if (textFallback && /unable to modify|cannot modify|not defined|I am unable to modify|I cannot modify/i.test(textFallback)) {
                   const parsed = tryParseJsonFromText(textFallback);
@@ -1219,6 +1345,7 @@ Office.onReady(async (info) => {
                       if (rc2) rc2.textContent = parsed.explanation || "Draft updated.";
                       showUndoToast();
                     } catch (e) {
+                      // FALLBACK RETAINED: Open in new compose window
                       draft = html;
                       const cleaned = sanitizeHtml(html);
                       openComposeWithHtml(item, cleaned, getSuggestedSubjectFromItem(item));
@@ -1233,6 +1360,7 @@ Office.onReady(async (info) => {
                       if (rc2) rc2.textContent = "Applied assistant's suggested draft.";
                       showUndoToast();
                     } catch (e) {
+                      // FALLBACK RETAINED: Open in new compose window
                       openComposeWithHtml(item, cleanedHtml, getSuggestedSubjectFromItem(item));
                       draft = cleanedHtml;
                       if (rc2) rc2.textContent = "Opened compose with assistant's suggestion.";
@@ -1242,6 +1370,7 @@ Office.onReady(async (info) => {
                     if (rc2) rc2.textContent = "Assistant refused to call the tool and returned no usable draft.";
                   }
                 } else {
+                  // FINAL FALLBACK RETAINED: Open in new compose window
                   const text = extractModelText(normalized) || "";
                   draft = removeHtmlFences(text);
                   const cleaned = sanitizeHtml(draft);
@@ -1251,6 +1380,7 @@ Office.onReady(async (info) => {
               }
             }
           } else {
+            // CUSTOM ENDPOINT FALLBACK RETAINED: Open in new compose window
             const resp = await callCustomEndpoint({ fromEmailAddress: name, subject: item.subject || "Unknown", body: emailBody });
             draft = removeHtmlFences(resp?.response?.answer?.email_draft || "");
             const cleaned = sanitizeHtml(draft);
@@ -1271,7 +1401,7 @@ Office.onReady(async (info) => {
     log("COMPOSE mode");
     document.getElementById("sentimentContent")?.classList.add("hidden");
     document.getElementById("btnQuickReply")?.setAttribute("disabled","true");
-    const rc = document.getElementById("responseContainer"); if (rc) rc.innerHTML = "This feature is not available in compose mode.";
+    const rc = document.getElementById("responseContainer"); if (rc) rc.innerHTML = "Use the chat panel to modify the draft.";
   } else {
     log("Unsupported mode");
     document.getElementById("sentimentContent")?.classList.add("hidden");
@@ -1297,7 +1427,7 @@ function registerThemeChangeHandler() {
       if (result && result.status === Office.AsyncResultStatus.Failed) {
         console.error("Failed to register theme change handler:", result.error && result.error.message);
       } else {
-        try { const currentTheme = mailbox.officeTheme; if (currentTheme) applyOfficeThemeVars(currentTheme); } catch (e) { /* ignore error */ } // Fixed: Empty block statement and unused var
+        try { const currentTheme = mailbox.officeTheme; if (currentTheme) applyOfficeThemeVars(currentTheme); } catch (e) { /* ignore error */ }
         console.debug("Theme change handler registered.");
       }
     });

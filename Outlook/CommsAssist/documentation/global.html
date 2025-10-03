@@ -577,7 +577,7 @@
 
 <div class="description">
     Parse assistant text for a fenced HTML block or embedded HTML and apply it to compose.
-Returns true when applied (setAsync or fallback opened compose), false otherwise.
+Returns true when applied (setAsync succeeded or new window opened), false otherwise.
 </div>
 
 
@@ -693,7 +693,7 @@ Returns true when applied (setAsync or fallback opened compose), false otherwise
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line781">line 781</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line871">line 871</a>
     </li></ul></dd>
     
 
@@ -2674,7 +2674,7 @@ Includes a robust fallback when model refuses to call the tool.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line856">line 856</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line982">line 982</a>
     </li></ul></dd>
     
 
@@ -3334,7 +3334,7 @@ Accepts candidate.content.parts, choice.message, groundingMetadata.searchEntryPo
     
 
     
-    <h4 class="name" id="openComposeWithHtml"><span class="type-signature"></span>openComposeWithHtml<span class="signature">(item, htmlDraft, fallbackSubject)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="openComposeWithHtml"><span class="type-signature"></span>openComposeWithHtml<span class="signature">(originalItem, htmlBody, subject<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise.&lt;boolean>}</span></h4>
     
 
     
@@ -3342,7 +3342,10 @@ Accepts candidate.content.parts, choice.message, groundingMetadata.searchEntryPo
 
 
 <div class="description">
-    Open compose window populated with provided HTML draft (fallback).
+    Open a compose window populated with provided HTML.
+Tries displayReplyAllForm, then displayReplyForm, then displayNewMessageForm.
+Resolves true when a compose window was opened, false when no compose API was available,
+and rejects only on unexpected fatal errors.
 </div>
 
 
@@ -3366,6 +3369,8 @@ Accepts candidate.content.parts, choice.message, groundingMetadata.searchEntryPo
         <th>Type</th>
 
         
+        <th>Attributes</th>
+        
 
         
 
@@ -3378,18 +3383,32 @@ Accepts candidate.content.parts, choice.message, groundingMetadata.searchEntryPo
 
         <tr>
             
-                <td class="name"><code>item</code></td>
+                <td class="name"><code>originalItem</code></td>
             
 
             <td class="type">
             
                 
 <span class="param-type">Office.Item</span>
+|
+
+<span class="param-type">null</span>
+|
+
+<span class="param-type">undefined</span>
 
 
             
             </td>
 
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
             
 
             
@@ -3401,7 +3420,7 @@ Accepts candidate.content.parts, choice.message, groundingMetadata.searchEntryPo
 
         <tr>
             
-                <td class="name"><code>htmlDraft</code></td>
+                <td class="name"><code>htmlBody</code></td>
             
 
             <td class="type">
@@ -3414,6 +3433,14 @@ Accepts candidate.content.parts, choice.message, groundingMetadata.searchEntryPo
             </td>
 
             
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
 
             
 
@@ -3424,7 +3451,7 @@ Accepts candidate.content.parts, choice.message, groundingMetadata.searchEntryPo
 
         <tr>
             
-                <td class="name"><code>fallbackSubject</code></td>
+                <td class="name"><code>subject</code></td>
             
 
             <td class="type">
@@ -3436,6 +3463,16 @@ Accepts candidate.content.parts, choice.message, groundingMetadata.searchEntryPo
             
             </td>
 
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
             
 
             
@@ -3481,7 +3518,7 @@ Accepts candidate.content.parts, choice.message, groundingMetadata.searchEntryPo
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line754">line 754</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line771">line 771</a>
     </li></ul></dd>
     
 
@@ -3506,6 +3543,24 @@ Accepts candidate.content.parts, choice.message, groundingMetadata.searchEntryPo
 
 
 
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;boolean></span>
+
+
+    </dd>
+</dl>
+
+    
 
 
 
@@ -3569,7 +3624,7 @@ Accepts candidate.content.parts, choice.message, groundingMetadata.searchEntryPo
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line1290">line 1290</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line1420">line 1420</a>
     </li></ul></dd>
     
 
@@ -4287,7 +4342,7 @@ Accepts candidate.content.parts, choice.message, groundingMetadata.searchEntryPo
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line1310">line 1310</a>
+        <a href="pane.js.html">pane.js</a>, <a href="pane.js.html#line1440">line 1440</a>
     </li></ul></dd>
     
 
@@ -4663,7 +4718,7 @@ Returns parsed object or null.
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Thu Oct 02 2025 23:05:39 GMT+0100 (British Summer Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Fri Oct 03 2025 22:05:22 GMT+0100 (British Summer Time)
 </footer>
 
 <script> prettyPrint(); </script>
