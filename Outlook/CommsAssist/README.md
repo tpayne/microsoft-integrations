@@ -4,7 +4,7 @@ This project is a sample Outlook add-in that leverages the Gemini API to provide
 
 ## I. Overview
 
-The add-in appears as a task pane in Outlook when reading an an email. Its main function is to analyze the email content and provide intelligent assistance using Google's Gemini AI. The tool is now highly robust in a compose/reply context, using a strict internal mechanism to **track the latest edited draft** and prevent general chat queries from inadvertently modifying the email body.
+The add-in appears as a task pane in Outlook when reading an email. Its main function is to analyze the email content and provide intelligent assistance using Google's Gemini AI. The tool is now highly robust in a compose/reply context, using a strict internal mechanism to **track the latest edited draft** and prevent general chat queries from inadvertently modifying the email body.
 
 The add-in uses Office.js to read the subject, sender, and body of the current email, creating a detailed prompt for the AI model. It works only in Read Mode and notifies users if accessed in Compose Mode.
 
