@@ -1,5 +1,5 @@
 # Use a Node.js base image to run the npm commands
-FROM node:22-alpine AS build_stage
+FROM node:24-alpine AS build_stage
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -21,7 +21,7 @@ RUN npm run clean && npm run dist
 # -----------------------------------------------------------------------------
 
 # Use the official Tomcat image for the final production environment
-FROM tomcat:11.0.11-jre17-temurin AS final_stage
+FROM tomcat:11.0.14-jre17-temurin AS final_stage
 
 # Copy the built files from the 'dist/public' directory of the build stage
 # into the correct location in the Tomcat webapps directory.
