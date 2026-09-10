@@ -36,7 +36,7 @@
     "jsdoc": "^4.0.4",
     "npm-run-all2": "8.0.4",
     "office-addin-cli": "^2.0.3",
-    "office-addin-debugging": "^6.0.3",
+    "office-addin-debugging": "^7.0.0",
     "office-addin-dev-certs": "^2.0.3",
     "office-addin-lint": "^3.0.3",
     "office-addin-manifest": "^2.0.3",
